@@ -1,0 +1,914 @@
+{
+ "config": "ultra",
+ "runs": 1,
+ "settings": {
+  "PERCEIVE_PROVIDER": "nvidia",
+  "REASON_PROVIDER": "nebius",
+  "MODEL_PERCEIVE": "",
+  "MODEL_REASON": "nvidia/Nemotron-3-Ultra-550b-a55b",
+  "FALLBACK": "false"
+ },
+ "usage": {
+  "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": {
+   "calls": 28,
+   "prompt_tokens": 65632,
+   "completion_tokens": 3748,
+   "cached_tokens": 2176
+  },
+  "nebius:nvidia/Nemotron-3-Ultra-550b-a55b": {
+   "calls": 41,
+   "prompt_tokens": 72123,
+   "completion_tokens": 49626,
+   "cached_tokens": 0
+  }
+ },
+ "summary": "Visits read: 14 of 14 (100%) (a visit not read counts as a miss below)\nAllergy clash caught: 5 of 5 (100%)\n  with the right colour (red or amber): 5 of 5 (100%)\n  naming the medicine at fault: 5 of 5 (100%)\nAllergy false alarms, allergy recorded and nothing to flag (A6, A7): 0 of 2 (0%)\nAllergy false alarms, no allergy recorded: 0 of 7 (0%)\nBilled but not prescribed caught: 4 of 4 (100%)\nBilled false alarms: 0 across 14 visits\nMedicines read: 25 of 25 (100%)\nMedicines not on the prescription: 0\nQuotes rejected by the code check: 0\nBackup answered: never\nSeconds per visit read: median 22.2, min 17.3, max 26.2\nTokens nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning: 28 calls, 65632 in (2176 cached), 3748 out\nTokens nebius:nvidia/Nemotron-3-Ultra-550b-a55b: 41 calls, 72123 in (0 cached), 49626 out\nToken Factory cost: $0.2210",
+ "rows": [
+  {
+   "case": "A1",
+   "run": 1,
+   "seconds": 26.2,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "checking_medicines": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b",
+     "tavily:search"
+    ],
+    "cross_checking": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 6.79,
+    "sorting_documents": 5.76,
+    "extracting": 6.79,
+    "checking_medicines": 5.16,
+    "cross_checking": 1.56
+   },
+   "discrepancies": [
+    {
+     "check": "allergy_clash",
+     "severity": "urgent",
+     "message": "Cap Mox 500 mg contains amoxycillin, a penicillin. Your record lists an allergy to Penicillin. Please show this to your doctor or pharmacist."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Cap Mox 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "amoxycillin"
+     ]
+    },
+    {
+     "label": "Tab Dolo 650 mg",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": "urgent",
+    "clash_found": "urgent",
+    "clash_names_culprit": true,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A2",
+   "run": 1,
+   "seconds": 22.5,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 10.56,
+    "sorting_documents": 5.44,
+    "extracting": 6.49,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "allergy_clash",
+     "severity": "urgent",
+     "message": "Augmentin 625 mg contains amoxicillin, a penicillin. Your record lists an allergy to Penicillin. Please show this to your doctor or pharmacist."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Augmentin 625 mg",
+     "status": "proposed",
+     "generic_names": [
+      "amoxicillin",
+      "clavulanic acid"
+     ]
+    },
+    {
+     "label": "Pan 40",
+     "status": "proposed",
+     "generic_names": [
+      "pantoprazole"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": "urgent",
+    "clash_found": "urgent",
+    "clash_names_culprit": true,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A3",
+   "run": 1,
+   "seconds": 20.1,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 9.91,
+    "sorting_documents": 4.28,
+    "extracting": 5.85,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "allergy_clash",
+     "severity": "urgent",
+     "message": "Bactrim DS contains sulfamethoxazole, a sulfonamide antibiotic. Your record lists an allergy to Sulfa drugs. Please show this to your doctor or pharmacist."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Bactrim DS",
+     "status": "proposed",
+     "generic_names": [
+      "sulfamethoxazole",
+      "trimethoprim"
+     ]
+    },
+    {
+     "label": "Dolo 650",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": "urgent",
+    "clash_found": "urgent",
+    "clash_names_culprit": true,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A4",
+   "run": 1,
+   "seconds": 23.2,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 12.31,
+    "sorting_documents": 4.69,
+    "extracting": 6.22,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "allergy_clash",
+     "severity": "urgent",
+     "message": "Brufen 400 mg contains ibuprofen, an NSAID painkiller. Your record lists an allergy to Ibuprofen. Please show this to your doctor or pharmacist."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Brufen 400 mg",
+     "status": "proposed",
+     "generic_names": [
+      "ibuprofen"
+     ]
+    },
+    {
+     "label": "Pan 40 mg",
+     "status": "proposed",
+     "generic_names": [
+      "pantoprazole"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": "urgent",
+    "clash_found": "urgent",
+    "clash_names_culprit": true,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A5",
+   "run": 1,
+   "seconds": 24.1,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "checking_medicines": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b",
+     "tavily:search"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 12.11,
+    "sorting_documents": 4.9,
+    "extracting": 4.87,
+    "checking_medicines": 2.24,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "allergy_clash",
+     "severity": "review",
+     "message": "Taxim-O 200 mg contains cefixime, a cephalosporin. Your record lists an allergy to Penicillin. Penicillins and cephalosporins are related, and some people react to both. Worth asking your doctor or pharmacist about it."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Taxim-O 200 mg",
+     "status": "proposed",
+     "generic_names": [
+      "cefixime"
+     ]
+    },
+    {
+     "label": "Dolo 650 mg",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": "review",
+    "clash_found": "review",
+    "clash_names_culprit": true,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A6",
+   "run": 1,
+   "seconds": 19.4,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 8.92,
+    "sorting_documents": 3.74,
+    "extracting": 6.71,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [],
+   "medicines": [
+    {
+     "label": "Azithral 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "azithromycin"
+     ]
+    },
+    {
+     "label": "Dolo 650 mg",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A7",
+   "run": 1,
+   "seconds": 17.3,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 8.51,
+    "sorting_documents": 3.09,
+    "extracting": 5.7,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [],
+   "medicines": [
+    {
+     "label": "Dolo 650 mg",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    },
+    {
+     "label": "Allegra 120 mg",
+     "status": "proposed",
+     "generic_names": [
+      "fexofenadine"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": true,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "A8",
+   "run": 1,
+   "seconds": 21.9,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "checking_medicines": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 12.15,
+    "sorting_documents": 4.35,
+    "extracting": 4.64,
+    "checking_medicines": 0.72,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [],
+   "medicines": [
+    {
+     "label": "Cap Mox 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "amoxycillin"
+     ]
+    },
+    {
+     "label": "Tab Pan 40",
+     "status": "proposed",
+     "generic_names": [
+      "pantoprazole"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "allergy",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B1",
+   "run": 1,
+   "seconds": 23.6,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 15.57,
+    "sorting_documents": 4.47,
+    "extracting": 3.57,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "billed_not_prescribed",
+     "severity": "review",
+     "message": "Pan 40 Tab (pantoprazole) is on the bill, but not on the prescription or in the consult. Worth checking with the pharmacy or your doctor."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Azithral 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "azithromycin"
+     ]
+    },
+    {
+     "label": "Dolo 650 mg",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [
+     "Pan 40"
+    ],
+    "billed_caught": [
+     "Pan 40"
+    ],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B2",
+   "run": 1,
+   "seconds": 20.4,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 11.29,
+    "sorting_documents": 4.47,
+    "extracting": 4.66,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "billed_not_prescribed",
+     "severity": "review",
+     "message": "Allegra 120 Tab (fexofenadine) is on the bill, but not on the prescription or in the consult. Worth checking with the pharmacy or your doctor."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Augmentin 625 mg",
+     "status": "proposed",
+     "generic_names": [
+      "amoxicillin",
+      "clavulanic acid"
+     ]
+    },
+    {
+     "label": "Montair LC",
+     "status": "proposed",
+     "generic_names": [
+      "montelukast",
+      "levocetirizine"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [
+     "Allegra"
+    ],
+    "billed_caught": [
+     "Allegra"
+    ],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B3",
+   "run": 1,
+   "seconds": 23.9,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "checking_medicines": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b",
+     "tavily:search"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 11.79,
+    "sorting_documents": 4.85,
+    "extracting": 5.16,
+    "checking_medicines": 2.03,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "billed_not_prescribed",
+     "severity": "review",
+     "message": "Telma 40 Tab (telmisartan) is on the bill, but not on the prescription or in the consult. Worth checking with the pharmacy or your doctor."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Glycomet 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "metformin"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [
+     "Telma"
+    ],
+    "billed_caught": [
+     "Telma"
+    ],
+    "billed_false": [],
+    "meds_expected": 1,
+    "meds_found": 1,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B4",
+   "run": 1,
+   "seconds": 23.9,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 12.73,
+    "sorting_documents": 4.48,
+    "extracting": 6.68,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [
+    {
+     "check": "billed_not_prescribed",
+     "severity": "review",
+     "message": "Brufen 400 Tab (ibuprofen) is on the bill, but not on the prescription or in the consult. Worth checking with the pharmacy or your doctor."
+    }
+   ],
+   "medicines": [
+    {
+     "label": "Tab Dolo 650",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [
+     "Brufen"
+    ],
+    "billed_caught": [
+     "Brufen"
+    ],
+    "billed_false": [],
+    "meds_expected": 1,
+    "meds_found": 1,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B5",
+   "run": 1,
+   "seconds": 21.5,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "checking_medicines": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 11.25,
+    "sorting_documents": 4.6,
+    "extracting": 4.88,
+    "checking_medicines": 0.74,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [],
+   "medicines": [
+    {
+     "label": "Cap Mox 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "amoxycillin"
+     ]
+    },
+    {
+     "label": "Tab Dolo 650",
+     "status": "proposed",
+     "generic_names": [
+      "paracetamol"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 2,
+    "meds_found": 2,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  },
+  {
+   "case": "B6",
+   "run": 1,
+   "seconds": 20.4,
+   "status": "ready",
+   "error": null,
+   "models_used": {
+    "reading_documents": [
+     "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    ],
+    "sorting_documents": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "extracting": [
+     "nebius:nvidia/Nemotron-3-Ultra-550b-a55b"
+    ]
+   },
+   "step_seconds": {
+    "reading_documents": 11.82,
+    "sorting_documents": 4.14,
+    "extracting": 4.47,
+    "checking_medicines": 0.0,
+    "cross_checking": 0.0
+   },
+   "discrepancies": [],
+   "medicines": [
+    {
+     "label": "Azithral 500 mg",
+     "status": "proposed",
+     "generic_names": [
+      "azithromycin"
+     ]
+    }
+   ],
+   "quote_failures": [],
+   "score": {
+    "group": "billed",
+    "allergy_recorded": false,
+    "clash_expected": null,
+    "clash_found": null,
+    "clash_names_culprit": false,
+    "billed_expected": [],
+    "billed_caught": [],
+    "billed_false": [],
+    "meds_expected": 1,
+    "meds_found": 1,
+    "meds_extra": [],
+    "quotes_rejected": 0,
+    "backup_steps": []
+   }
+  }
+ ]
+}

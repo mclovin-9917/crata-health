@@ -21,7 +21,7 @@ Built for the Nebius x NVIDIA Global AI Hackathon. Everything in this repo is sy
 
 - **Nemotron 3 Nano Omni** (NVIDIA build) reads document photos and scanned PDF pages, and transcribes consult recordings in pieces of about 30 seconds.
 - **Nemotron 3 Super** does the reasoning: it sorts documents (prescription, bill, report) and reads bills line by line, extracts structured entries each with a quote, matches brand names to active ingredients, names drug families for the allergy check, translates Hindi left in details, and writes the medicine summaries. Extraction runs at temperature 0.
-- **Nemotron 3 Ultra** was compared with Super in the evaluation.
+- **Nemotron 3 Ultra** was compared with Super in the evaluation: the same answers on every case, at about 4 times the cost per visit, so the app uses Super.
 
 Policy stays in code, not in the model: which facts need your confirmation, dates, who said what, and the checks themselves.
 
@@ -47,6 +47,8 @@ Every model call goes through one OpenAI-compatible client with a provider per s
 | Token Factory cost | $0.16 for all 42 visits |
 
 These are clean, printed documents of the kind the app was built for. They do not show how it does on handwriting, poor photos or recordings.
+
+Comparisons on the same cases: Nemotron 3 Ultra gave the same answers as Super at about 4 times the cost. Nano Omni was right on every visit it read, but NVIDIA build's free tier turned away 4 of 14; Gemma 3 27B on Token Factory read all 14 right, which is why it is the backup. Full tables in [docs/eval.md](docs/eval.md).
 
 ## Run it yourself
 

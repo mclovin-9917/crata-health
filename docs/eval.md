@@ -71,4 +71,21 @@ backend\.venv\Scripts\python scripts\eval\run_eval.py --config gemma
 
 The same answer came back in all three runs for every case. Nano Omni on NVIDIA build is free; it answered 67 calls (157,048 tokens in). Raw output: `scripts/eval/results/main-20261026-1300.json`.
 
+### Comparisons, 1 run of the 14 cases each, backups off (2026-10-26)
+
+| | Main (Super, Omni + Gemma backup, 3 runs) | Ultra reasons | Omni alone reads | Gemma alone reads |
+|---|---|---|---|---|
+| Visits read | 42 of 42 | 14 of 14 | 10 of 14 | 14 of 14 |
+| Allergy clash caught (right colour and medicine) | 15 of 15 | 5 of 5 | 4 of 5 | 5 of 5 |
+| False alarms | 0 | 0 | 0 | 0 |
+| Billed but not prescribed caught | 12 of 12 | 4 of 4 | 1 of 4 | 4 of 4 |
+| Medicines read | 75 of 75 | 25 of 25 | 18 of 25 | 25 of 25 |
+| Median seconds per visit | 26.5 | 22.2 | 28.9 | 29.4 |
+| Token Factory cost per visit | $0.0037 | $0.0158 | $0.0029 | $0.0041 |
+
+- **Super vs Ultra:** the same answers on every case. Ultra cost about 4 times as much per visit ($0.22 against about $0.05 for the same 14 visits on Super), so Super stays in the app.
+- **Nano Omni vs Gemma 3 27B for reading:** every visit Omni read was fully right. The 4 it missed were refused by NVIDIA build's free tier ("503 ResourceExhausted: Worker local total request limit reached"), not misread. Gemma on Token Factory read all 14 right. This is why the app keeps Gemma as Omni's backup: in the main runs it stepped in for 16 of 42 visits.
+
+Raw output: `scripts/eval/results/ultra-20261026-1309.json`, `omni-20261026-1314.json`, `gemma-20261026-1321.json`.
+
 What this does and does not show: on clean, printed prescriptions and bills of the kind the app was built for, the whole pipeline found every planted problem and raised no false alarm. It does not show how the app does on handwriting, poor photos, recordings, or medicines outside its brand table; see "How new they are" above.
