@@ -1,0 +1,1921 @@
+[
+ {
+  "id": "debeef0ad0ab40a0ad539255b51a943c",
+  "patient_id": "demo-asha",
+  "created_at": "2026-06-15T09:00:00Z",
+  "visit_date": "2026-06-15",
+  "visit_date_source": "document",
+  "title": "HbA1c lipid profile",
+  "title_source": "ai",
+  "facility": "Lakeside Diagnostics",
+  "facility_quote": "Lakeside Diagnostics",
+  "facility_source_id": "3aa401e77edd4bac9a56e6990982660d",
+  "status": "ready",
+  "step": null,
+  "error": null,
+  "sources": [
+   {
+    "id": "3aa401e77edd4bac9a56e6990982660d",
+    "source_type": "image",
+    "filename": "lab-report-june.png",
+    "added_at": "2026-10-22T15:30:43.080314Z",
+    "text": "Lakeside Diagnostics\n14 Lake Road, Pune | Ph: 020-2222-0000 (synthetic)\n\nLABORATORY REPORT\n\nPatient: Asha Verma Age/Sex: 35 / F Lab No: SYN-LAB-2620\nCollected on 15/06/2026 Reported on 15/06/2026\n\nGlycosylated haemoglobin:\nHbA1c 6.4 % (4.0 - 5.6)\n\nLipid profile:\nTotal cholesterol 228 mg/dL (up to 200)\n\nLDL:\nLDL cholesterol 148 mg/dL (up to 100)\n\nHDL:\nHDL cholesterol 41 mg/dL (40 - 60)\n\nTriglycerides:\nTriglycerides 190 mg/dL (up to 150)\n\nBlood sugar:\nFasting blood sugar 118 mg/dL (70 - 99)\n\nKidney function:\nCreatinine 0.9 mg/dL (0.6 - 1.2)\n\nDr. R. Kulkarni, MD (Pathology) Reg. No. SYN-5005 (synthetic)",
+    "segments": [],
+    "reread_of": null,
+    "careful": false,
+    "document_kind": "report",
+    "pages": null,
+    "page_texts": [],
+    "page_kinds": [],
+    "recording_consent": null,
+    "report_for": null
+   }
+  ],
+  "entries": [
+   {
+    "id": "261487e5bbfe42be8e2949443e61808b",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "test",
+    "label": "HbA1c",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "HbA1c 6.4 % (4.0 - 5.6)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509673Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "32af9d9577da43eba4ff9afeebcb69cf",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "test",
+    "label": "Lipid profile",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Lipid profile:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509680Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "4c0bb20ba11348b0b038b202885f0851",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "test",
+    "label": "Kidney function",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Kidney function:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509683Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "3af6f97d263145458942dc95f11977e2",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "test",
+    "label": "Blood sugar",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Blood sugar:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509687Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "6328dac97eac4d5697a5a2052403c70d",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "HbA1c",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "HbA1c 6.4 % (4.0 - 5.6)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.507137Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 6.4,
+     "value_text": null,
+     "unit": "%",
+     "ref_low": 4.0,
+     "ref_high": 5.6,
+     "ref_text": "(4.0 - 5.6)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "261487e5bbfe42be8e2949443e61808b"
+    ],
+    "checks": []
+   },
+   {
+    "id": "ea91b4b5451c49a8b8803ecb4c195769",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "Total cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Total cholesterol 228 mg/dL (up to 200)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.507547Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 228.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 200.0,
+     "ref_text": "(up to 200)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "32af9d9577da43eba4ff9afeebcb69cf"
+    ],
+    "checks": []
+   },
+   {
+    "id": "7043a66a1fab4927b71da6e7b1f4fdb1",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "LDL cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "LDL cholesterol 148 mg/dL (up to 100)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.507963Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 148.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 100.0,
+     "ref_text": "(up to 100)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "32af9d9577da43eba4ff9afeebcb69cf"
+    ],
+    "checks": []
+   },
+   {
+    "id": "7205f938b57647f1ad6b72405b3a823f",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "HDL cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "HDL cholesterol 41 mg/dL (40 - 60)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.508338Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 41.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 40.0,
+     "ref_high": 60.0,
+     "ref_text": "(40 - 60)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "32af9d9577da43eba4ff9afeebcb69cf"
+    ],
+    "checks": []
+   },
+   {
+    "id": "d10cd3b347494aa2bbbf3c36d837d151",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "Triglycerides",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Triglycerides 190 mg/dL (up to 150)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.508701Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 190.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 150.0,
+     "ref_text": "(up to 150)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "32af9d9577da43eba4ff9afeebcb69cf"
+    ],
+    "checks": []
+   },
+   {
+    "id": "8935949cebe8421298256cd294567d79",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "Fasting blood sugar",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Fasting blood sugar 118 mg/dL (70 - 99)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509124Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 118.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 70.0,
+     "ref_high": 99.0,
+     "ref_text": "(70 - 99)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "3af6f97d263145458942dc95f11977e2"
+    ],
+    "checks": []
+   },
+   {
+    "id": "aa80c2f63fa941f09f0396cdbe044b62",
+    "patient_id": "demo-asha",
+    "encounter_id": "debeef0ad0ab40a0ad539255b51a943c",
+    "kind": "result",
+    "label": "Creatinine",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "3aa401e77edd4bac9a56e6990982660d",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Creatinine 0.9 mg/dL (0.6 - 1.2)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:31:33.509486Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 0.9,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 0.6,
+     "ref_high": 1.2,
+     "ref_text": "(0.6 - 1.2)",
+     "measured_on": "2026-06-15"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "4c0bb20ba11348b0b038b202885f0851"
+    ],
+    "checks": []
+   }
+  ],
+  "discrepancies": [],
+  "bill_lines": [],
+  "stay": null,
+  "summary": null,
+  "step_seconds": {
+   "reading_documents": 23.19,
+   "sorting_documents": 2.22,
+   "extracting": 25.01,
+   "checking_medicines": 0.0,
+   "cross_checking": 0.0
+  },
+  "models_used": {
+   "reading_documents": [
+    "nebius:google/gemma-3-27b-it (backup)"
+   ],
+   "sorting_documents": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "extracting": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ]
+  },
+  "quote_failures": []
+ },
+ {
+  "id": "6fafdb43c8074e9991b768c1ebf5df45",
+  "patient_id": "demo-asha",
+  "created_at": "2026-07-14T06:30:00Z",
+  "visit_date": "2026-07-14",
+  "visit_date_source": "patient",
+  "title": "Blood pressure check-up",
+  "title_source": "ai",
+  "facility": "City Clinic",
+  "facility_quote": "City Clinic",
+  "facility_source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+  "status": "ready",
+  "step": null,
+  "error": null,
+  "sources": [
+   {
+    "id": "58051e6b66a1444d80e0cb1bde16dd92",
+    "source_type": "text",
+    "filename": null,
+    "added_at": "2026-10-22T15:29:27.198862Z",
+    "text": "Blood pressure check-up with Dr. Kapoor at City Clinic. Doctor said my BP is 146/92, a little high. Continue Amlodipine 5 mg once a day in the morning. Cut down on salt and walk 30 minutes a day. Get a lipid profile and kidney function test done. Review after 3 months.",
+    "segments": [],
+    "reread_of": null,
+    "careful": false,
+    "document_kind": null,
+    "pages": null,
+    "page_texts": [],
+    "page_kinds": [],
+    "recording_consent": null,
+    "report_for": null
+   }
+  ],
+  "entries": [
+   {
+    "id": "a9cf159282ff484f9a7f2ccbf780895c",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "note",
+    "label": "Blood pressure 146/92",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Doctor said my BP is 146/92,"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.856171Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "doctor",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "6646da876055488d9dde229d0ee3d5c8",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "medication",
+    "label": "Amlodipine 5 mg",
+    "fields": {
+     "frequency": "once a day in the morning"
+    },
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Continue Amlodipine 5 mg once a day in the morning."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.893280Z",
+      "by": "demo-asha",
+      "note": null
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "doctor",
+    "medication": {
+     "dose": null,
+     "doses_per_day": 1.0,
+     "duration_days": null,
+     "started_on": "2026-10-22",
+     "ongoing": false,
+     "stopped_on": null,
+     "generic_names": [
+      "amlodipine"
+     ],
+     "generic_from": "table",
+     "generic_source": null
+    },
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "2fc5ddad04f748728cebbcd5debce85a",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "note",
+    "label": "Reduce salt intake and walk 30 minutes daily",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Cut down on salt and walk 30 minutes a day."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.856389Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "doctor",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "badd3558bc484ca7bd2f05722a7db3a1",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "test",
+    "label": "Lipid profile",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Get a lipid profile and kidney function test done."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.856423Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "doctor",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "0f654adc0dc5472fb2f0243e2138d9fd",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "test",
+    "label": "Kidney function test",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Get a lipid profile and kidney function test done."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.856450Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "doctor",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "1c75acb37fe0473f9f0863bebef44a68",
+    "patient_id": "demo-asha",
+    "encounter_id": "6fafdb43c8074e9991b768c1ebf5df45",
+    "kind": "follow_up",
+    "label": "Review after 3 months",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "58051e6b66a1444d80e0cb1bde16dd92",
+      "source_type": "text",
+      "locator": null,
+      "quote": "Review after 3 months."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:29:48.856482Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "doctor",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   }
+  ],
+  "discrepancies": [],
+  "bill_lines": [],
+  "stay": null,
+  "summary": null,
+  "step_seconds": {
+   "extracting": 21.65,
+   "checking_medicines": 0.0,
+   "cross_checking": 0.03
+  },
+  "models_used": {
+   "extracting": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ]
+  },
+  "quote_failures": []
+ },
+ {
+  "id": "1447dcb025cd4559a2f45f4fba542afb",
+  "patient_id": "demo-asha",
+  "created_at": "2026-09-14T09:00:00Z",
+  "visit_date": "2026-09-14",
+  "visit_date_source": "document",
+  "title": "HbA1c lipid profile",
+  "title_source": "ai",
+  "facility": "Lakeside Diagnostics",
+  "facility_quote": "Lakeside Diagnostics",
+  "facility_source_id": "078c881d18ea47c59245ecb920b1e6b1",
+  "status": "ready",
+  "step": null,
+  "error": null,
+  "sources": [
+   {
+    "id": "078c881d18ea47c59245ecb920b1e6b1",
+    "source_type": "image",
+    "filename": "lab-report-september.png",
+    "added_at": "2026-10-22T15:31:33.535080Z",
+    "text": "Lakeside Diagnostics\n14 Lake Road, Pune | Ph: 020-2222-0000 (synthetic)\n\nLABORATORY REPORT\n\nPatient: Asha Verma Age/Sex: 35 / F Lab No: SYN-LAB-2620\nCollected on 14/09/2026 Reported on 14/09/2026\n\nGlycosylated haemoglobin:\n\nHbA1c 6.1 % (4.0 - 5.6)\n\nLipid profile:\n\nTotal cholesterol 214 mg/dL (up to 200)\n\nLDL:\n\nLDL cholesterol 136 mg/dL (up to 100)\n\nHDL:\n\nHDL cholesterol 43 mg/dL (40 - 60)\n\nTriglycerides:\n\nTriglycerides 172 mg/dL (up to 150)\n\nBlood sugar:\n\nFasting blood sugar 108 mg/dL (70 - 99)\n\nKidney function:\n\nCreatinine 0.9 mg/dL (0.6 - 1.2)\n\nDr. R. Kulkarni, MD (Pathology) Reg. No. SYN-5005 (synthetic)",
+    "segments": [],
+    "reread_of": null,
+    "careful": false,
+    "document_kind": "report",
+    "pages": null,
+    "page_texts": [],
+    "page_kinds": [],
+    "recording_consent": null,
+    "report_for": null
+   }
+  ],
+  "entries": [
+   {
+    "id": "dc892e6b7fde4fddbde75b87de72bbdf",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "test",
+    "label": "HbA1c",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Glycosylated haemoglobin:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.847249Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "da6b2c8e8dea42d4a3c3d630af0c2925",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "test",
+    "label": "Lipid profile",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Lipid profile:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.847257Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "b602fca7374a472fb6e150f319038f76",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "test",
+    "label": "Fasting blood sugar",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Blood sugar:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.847261Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "7f4378a757d741d6b663a73e64361c34",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "test",
+    "label": "Creatinine",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Kidney function:"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.847265Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "12bb41f0b11241b680a7d8401911d46e",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "HbA1c",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "HbA1c 6.1 % (4.0 - 5.6)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.844662Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 6.1,
+     "value_text": null,
+     "unit": "%",
+     "ref_low": 4.0,
+     "ref_high": 5.6,
+     "ref_text": "(4.0 - 5.6)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "dc892e6b7fde4fddbde75b87de72bbdf"
+    ],
+    "checks": []
+   },
+   {
+    "id": "3bfe290b3aad44e5b6082044c58380d8",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "Total cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Total cholesterol 214 mg/dL (up to 200)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.845086Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 214.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 200.0,
+     "ref_text": "(up to 200)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "da6b2c8e8dea42d4a3c3d630af0c2925"
+    ],
+    "checks": []
+   },
+   {
+    "id": "071aefb867034959ade92856a60e1496",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "LDL cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "LDL cholesterol 136 mg/dL (up to 100)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.845476Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 136.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 100.0,
+     "ref_text": "(up to 100)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "da6b2c8e8dea42d4a3c3d630af0c2925"
+    ],
+    "checks": []
+   },
+   {
+    "id": "8b6d577380ad4486a9c4d2319542a4c0",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "HDL cholesterol",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "HDL cholesterol 43 mg/dL (40 - 60)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.845872Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 43.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 40.0,
+     "ref_high": 60.0,
+     "ref_text": "(40 - 60)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "da6b2c8e8dea42d4a3c3d630af0c2925"
+    ],
+    "checks": []
+   },
+   {
+    "id": "7a07bdfc8a9344b4a200cd964de78500",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "Triglycerides",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Triglycerides 172 mg/dL (up to 150)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.846260Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 172.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": null,
+     "ref_high": 150.0,
+     "ref_text": "(up to 150)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "da6b2c8e8dea42d4a3c3d630af0c2925"
+    ],
+    "checks": []
+   },
+   {
+    "id": "9fa69e6ac6764756923b771f92d5a1e9",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "Fasting blood sugar",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Fasting blood sugar 108 mg/dL (70 - 99)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.846662Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 108.0,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 70.0,
+     "ref_high": 99.0,
+     "ref_text": "(70 - 99)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "b602fca7374a472fb6e150f319038f76"
+    ],
+    "checks": []
+   },
+   {
+    "id": "11035c4aad2848e7b3a1893f5da73b65",
+    "patient_id": "demo-asha",
+    "encounter_id": "1447dcb025cd4559a2f45f4fba542afb",
+    "kind": "result",
+    "label": "Creatinine",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "078c881d18ea47c59245ecb920b1e6b1",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Creatinine 0.9 mg/dL (0.6 - 1.2)"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:32:05.847035Z",
+      "by": "system",
+      "note": "Read from the report"
+     }
+    ],
+    "confidence": 0.9,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": {
+     "value": 0.9,
+     "value_text": null,
+     "unit": "mg/dL",
+     "ref_low": 0.6,
+     "ref_high": 1.2,
+     "ref_text": "(0.6 - 1.2)",
+     "measured_on": "2026-09-14"
+    },
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [
+     "7f4378a757d741d6b663a73e64361c34"
+    ],
+    "checks": []
+   }
+  ],
+  "discrepancies": [],
+  "bill_lines": [],
+  "stay": null,
+  "summary": null,
+  "step_seconds": {
+   "reading_documents": 8.49,
+   "sorting_documents": 2.17,
+   "extracting": 21.65,
+   "checking_medicines": 0.0,
+   "cross_checking": 0.0
+  },
+  "models_used": {
+   "reading_documents": [
+    "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+   ],
+   "sorting_documents": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "extracting": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ]
+  },
+  "quote_failures": []
+ },
+ {
+  "id": "852a9a8d361f48de9e2652b2478b12a3",
+  "patient_id": "demo-asha",
+  "created_at": "2026-10-22T15:29:48.941048Z",
+  "visit_date": "2026-10-12",
+  "visit_date_source": "document",
+  "title": "Acute bronchitis",
+  "title_source": "ai",
+  "facility": "Sunrise Family Clinic",
+  "facility_quote": "Sunrise Family Clinic",
+  "facility_source_id": "f83e270310ae4f9282a02bb3748aae2a",
+  "status": "ready",
+  "step": null,
+  "error": null,
+  "sources": [
+   {
+    "id": "f83e270310ae4f9282a02bb3748aae2a",
+    "source_type": "image",
+    "filename": "prescription.png",
+    "added_at": "2026-10-22T15:29:48.941225Z",
+    "text": "Sunrise Family Clinic\n12 Lake Road, Pune | Ph: 020-0000-0000 (synthetic)\n\nDr. A. Mehta, MBBS, MD (Medicine) Reg. No. SYN-0001\n\nDate: 12/10/2026\n\nPatient: Asha Verma\n\nComplaints: Fever and cough for 4 days\n\nDiagnosis: Acute bronchitis\n\nKnown allergy: Sulfa drugs\n\nRx\n\n1. Tab Augmentin 625 mg 1-0-1 x 5 days (after food)\n\n2. Tab Septran DS 1-0-1 x 5 days\n\n3. Syp Ascoril LS 10 ml 1-1-1 x 5 days\n\n4. Tab Dolo 650 SOS if fever > 100 F\n\nAdvice: Plenty of fluids. Steam inhalation twice a day.\nReview after 5 days if not better.\n\nDr. A. Mehta\n(signature, synthetic)\n\nAge/Sex: 35 / F",
+    "segments": [],
+    "reread_of": null,
+    "careful": false,
+    "document_kind": "prescription",
+    "pages": null,
+    "page_texts": [],
+    "page_kinds": [],
+    "recording_consent": null,
+    "report_for": null
+   },
+   {
+    "id": "72de1d41a8a349e6afa88c8d6b565eca",
+    "source_type": "image",
+    "filename": "bill.png",
+    "added_at": "2026-10-22T15:29:48.941274Z",
+    "text": "Wellness Pharmacy\nShop 4, Lake Road, Pune | DL No. SYN-DL-123 (synthetic)\n\nBill No: SYN-4471 Date: 12/10/2026\nPatient: Asha Verma Doctor: Dr. A. Mehta\n\nItem Qty Rate Amount\nAugmentin 625 Duo Tab 10 22.40 224.00\nSeptran DS Tab 10 3.10 31.00\nAscoril LS Syrup 100 ml 1 118.00 118.00\nDolo 650 Tab 15 2.04 30.60\nPantocid 40 Tab 10 14.50 145.00\nSyringe 5 ml 2 8.00 16.00\nTotal Rs. 564.60\n\nGoods once sold will not be taken back. (synthetic bill)",
+    "segments": [],
+    "reread_of": null,
+    "careful": false,
+    "document_kind": "bill",
+    "pages": null,
+    "page_texts": [],
+    "page_kinds": [],
+    "recording_consent": null,
+    "report_for": null
+   }
+  ],
+  "entries": [
+   {
+    "id": "a6dab32f58d2424490fa05af825f6bf2",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "symptom",
+    "label": "Fever and cough",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Fever and cough for 4 days"
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:30:43.046882Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "6441fc45b64d445580e3b3c0601ddfb4",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "diagnosis",
+    "label": "Acute bronchitis",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Diagnosis: Acute bronchitis"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "clinical_summary",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "319c3ddef755407eb3da16ace70130e8",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "allergy",
+    "label": "Sulfa drugs",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Known allergy: Sulfa drugs"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "ed6c310997544b348e16d583a338ff79",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "medication",
+    "label": "Augmentin 625 mg",
+    "fields": {
+     "frequency": "1-0-1",
+     "instructions": "after food"
+    },
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "1. Tab Augmentin 625 mg 1-0-1 x 5 days (after food)"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "document",
+    "medication": {
+     "dose": null,
+     "doses_per_day": null,
+     "duration_days": null,
+     "started_on": "2026-10-12",
+     "ongoing": false,
+     "stopped_on": null,
+     "generic_names": [
+      "amoxicillin",
+      "clavulanic acid"
+     ],
+     "generic_from": "table",
+     "generic_source": null
+    },
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "5146e7e0d95648f9b080b43c08042f93",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "medication",
+    "label": "Septran DS",
+    "fields": {
+     "frequency": "1-0-1"
+    },
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "2. Tab Septran DS 1-0-1 x 5 days"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "document",
+    "medication": {
+     "dose": null,
+     "doses_per_day": null,
+     "duration_days": null,
+     "started_on": "2026-10-12",
+     "ongoing": false,
+     "stopped_on": null,
+     "generic_names": [
+      "sulfamethoxazole",
+      "trimethoprim"
+     ],
+     "generic_from": "table",
+     "generic_source": null
+    },
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "d353de753f5246168b06d2b826eae375",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "medication",
+    "label": "Ascoril LS",
+    "fields": {
+     "frequency": "1-1-1"
+    },
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "3. Syp Ascoril LS 10 ml 1-1-1 x 5 days"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "document",
+    "medication": {
+     "dose": null,
+     "doses_per_day": null,
+     "duration_days": null,
+     "started_on": "2026-10-12",
+     "ongoing": false,
+     "stopped_on": null,
+     "generic_names": [
+      "ambroxol",
+      "levosalbutamol",
+      "guaifenesin"
+     ],
+     "generic_from": "table",
+     "generic_source": null
+    },
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "fd077ed3a47946ffbf5c1b98a1431218",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "medication",
+    "label": "Dolo 650",
+    "fields": {
+     "frequency": "SOS",
+     "instructions": "if fever > 100 F"
+    },
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "4. Tab Dolo 650 SOS if fever > 100 F"
+     }
+    ],
+    "status": "proposed",
+    "status_history": [],
+    "confidence": 0.95,
+    "tier": "emergency_card",
+    "said_by": "document",
+    "medication": {
+     "dose": null,
+     "doses_per_day": null,
+     "duration_days": null,
+     "started_on": "2026-10-12",
+     "ongoing": false,
+     "stopped_on": null,
+     "generic_names": [
+      "paracetamol"
+     ],
+     "generic_from": "table",
+     "generic_source": null
+    },
+    "result": null,
+    "added_as_read": false,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   },
+   {
+    "id": "de85770fd0654575bc6ba048c6c222e8",
+    "patient_id": "demo-asha",
+    "encounter_id": "852a9a8d361f48de9e2652b2478b12a3",
+    "kind": "follow_up",
+    "label": "Follow-up visit",
+    "fields": {},
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Review after 5 days if not better."
+     }
+    ],
+    "status": "confirmed",
+    "status_history": [
+     {
+      "status": "confirmed",
+      "at": "2026-10-22T15:30:43.046906Z",
+      "by": "system",
+      "note": "Read from the visit"
+     }
+    ],
+    "confidence": 0.95,
+    "tier": "full_record",
+    "said_by": "document",
+    "medication": null,
+    "result": null,
+    "added_as_read": true,
+    "edits": [],
+    "occurred_on": null,
+    "date_precision": null,
+    "unverified": false,
+    "links": [],
+    "checks": []
+   }
+  ],
+  "discrepancies": [
+   {
+    "id": "def1e9260b4d444e93e6f6f549d74a2a",
+    "check": "allergy_clash",
+    "message": "Septran DS contains sulfamethoxazole, a sulfonamide antibiotic. Your record lists an allergy to Sulfa drugs (hives). Please show this to your doctor or pharmacist.",
+    "entry_ids": [
+     "5146e7e0d95648f9b080b43c08042f93",
+     "0960df408a404c1eade5649d21a847d4",
+     "319c3ddef755407eb3da16ace70130e8"
+    ],
+    "bill_line_ids": [
+     "02d265955f734f85bff446e68e2c0488"
+    ],
+    "provenance": [
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "2. Tab Septran DS 1-0-1 x 5 days"
+     },
+     {
+      "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Septran DS Tab 10 3.10 31.00"
+     },
+     {
+      "source_id": "f83e270310ae4f9282a02bb3748aae2a",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Known allergy: Sulfa drugs"
+     }
+    ],
+    "severity": "urgent",
+    "matched_by": "table"
+   },
+   {
+    "id": "227a29d407d04710950e5f987dc1021c",
+    "check": "billed_not_prescribed",
+    "message": "Pantocid 40 Tab (pantoprazole) is on the bill, but not on the prescription or in the consult. Worth checking with the pharmacy or your doctor.",
+    "entry_ids": [],
+    "bill_line_ids": [
+     "b0a6a5c9116d4e3c842b3ae5abbd51bd"
+    ],
+    "provenance": [
+     {
+      "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+      "source_type": "image",
+      "locator": null,
+      "quote": "Pantocid 40 Tab 10 14.50 145.00"
+     }
+    ],
+    "severity": "review",
+    "matched_by": "table"
+   }
+  ],
+  "bill_lines": [
+   {
+    "id": "e40d91965d404a2ea3a333699a3101a3",
+    "name": "Augmentin 625 Duo Tab",
+    "quantity": 10.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": true,
+    "generic_names": [
+     "amoxicillin",
+     "clavulanic acid"
+    ],
+    "generic_from": "table",
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Augmentin 625 Duo Tab 10 22.40 224.00"
+    }
+   },
+   {
+    "id": "02d265955f734f85bff446e68e2c0488",
+    "name": "Septran DS Tab",
+    "quantity": 10.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": true,
+    "generic_names": [
+     "sulfamethoxazole",
+     "trimethoprim"
+    ],
+    "generic_from": "table",
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Septran DS Tab 10 3.10 31.00"
+    }
+   },
+   {
+    "id": "a26c434a47594dd588a9557b9e2e3c65",
+    "name": "Ascoril LS Syrup 100 ml",
+    "quantity": 1.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": true,
+    "generic_names": [
+     "ambroxol",
+     "levosalbutamol",
+     "guaifenesin"
+    ],
+    "generic_from": "table",
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Ascoril LS Syrup 100 ml 1 118.00 118.00"
+    }
+   },
+   {
+    "id": "826465b22fa1455284f16cb17fbaadd9",
+    "name": "Dolo 650 Tab",
+    "quantity": 15.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": true,
+    "generic_names": [
+     "paracetamol"
+    ],
+    "generic_from": "table",
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Dolo 650 Tab 15 2.04 30.60"
+    }
+   },
+   {
+    "id": "b0a6a5c9116d4e3c842b3ae5abbd51bd",
+    "name": "Pantocid 40 Tab",
+    "quantity": 10.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": true,
+    "generic_names": [
+     "pantoprazole"
+    ],
+    "generic_from": "table",
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Pantocid 40 Tab 10 14.50 145.00"
+    }
+   },
+   {
+    "id": "d8223a6d16f9457fb5fd33a2cb7dda3b",
+    "name": "Syringe 5 ml",
+    "quantity": 2.0,
+    "unit": null,
+    "units_per_pack": null,
+    "is_drug": false,
+    "generic_names": [],
+    "generic_from": null,
+    "generic_source": null,
+    "provenance": {
+     "source_id": "72de1d41a8a349e6afa88c8d6b565eca",
+     "source_type": "image",
+     "locator": null,
+     "quote": "Syringe 5 ml 2 8.00 16.00"
+    }
+   }
+  ],
+  "stay": null,
+  "summary": null,
+  "step_seconds": {
+   "reading_documents": 28.23,
+   "sorting_documents": 10.75,
+   "extracting": 15.12,
+   "checking_medicines": 0.0,
+   "cross_checking": 0.0
+  },
+  "models_used": {
+   "reading_documents": [
+    "nebius:google/gemma-3-27b-it (backup)",
+    "nvidia:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+   ],
+   "sorting_documents": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "extracting": [
+    "nebius:nvidia/nemotron-3-super-120b-a12b"
+   ]
+  },
+  "quote_failures": []
+ }
+]

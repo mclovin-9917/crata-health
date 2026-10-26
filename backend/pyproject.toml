@@ -1,0 +1,42 @@
+[project]
+name = "healthrecord-backend"
+version = "0.1.0"
+description = "Backend for a patient-owned health record app: AI pipeline, record schemas, storage interface."
+requires-python = ">=3.11"
+dependencies = [
+    # Pinned to the tested versions until submission, so CI, Docker and local
+    # match (2026-10-22: FastAPI 0.159 changed how missing bool form fields are read).
+    "fastapi>=0.143,<0.144",
+    "starlette>=1.7,<1.8",
+    "uvicorn[standard]>=0.30",
+    "openai>=1.50",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+    "tzdata>=2024.1",  # time zone data; Windows has none built in
+    "av>=13",  # ffmpeg's libraries: decode any browser audio format in memory
+    "numpy>=1.26",
+    "pypdfium2>=4.30",  # PDFs in memory: text layer, or pages rendered for the model
+    "pillow>=10",  # encodes rendered PDF pages as JPEG
+    "httpx>=0.27",  # Tavily search calls
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@import "@fontsource-variable/figtree";
+
+/* Sage & Sand theme (decided 2026-10-22, replaces Lagoon): a teal-leaning sage green on warm sand,
+   frosted-glass cards over a faint misty field (glass came back the same day), slate-blue for "Suggested".
+   The emergency card and the doctor page stay solid (.card-solid). One two-tone gradient on the hero; buttons and tiles
+   only shift a little within one hue. Never a gradient behind text the patient has to read.
+   Red is for emergencies, allergy clashes and errors, amber only for "check this", and every red,
+   amber or green element carries an icon and a word (colour-blind users cannot tell some of them apart).
+   The token names (ink, lagoon, tide) are kept so no screen needed editing; every text pair passes WCAG AA
+   contrast. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Figtree Variable", "Segoe UI", system-ui, sans-serif;
+
+  /* Neutrals tinted toward sand. ink-400 and darker pass WCAG AA on white and on the page. */
+  --color-ink-50: #f6f3ec;
+  --color-ink-100: #ece8dc;
+  --color-ink-200: #dcd8ca;
+  --color-ink-300: #bdb8a6;
+  --color-ink-400: #626f65;
+  --color-ink-500: #5b695f;
+  --color-ink-600: #4a584e;
+  --color-ink-700: #38453c;
+  --color-ink-800: #27332b;
+  --color-ink-900: #17201a;
+
+  /* Border of a field the patient types in (3:1 against white, WCAG 1.4.11). */
+  --color-line-strong: #8a8c7a;
+
+  /* Brand green. */
+  --color-lagoon-50: #edf4f1;
+  --color-lagoon-100: #d9e8e2;
+  --color-lagoon-200: #b8d3c9;
+  --color-lagoon-300: #8fb8a9;
+  --color-lagoon-400: #66998a;
+  --color-lagoon-500: #478070;
+  --color-lagoon-600: #36685a;
+  --color-lagoon-700: #2a5449;
+  --color-lagoon-800: #20423a;
+  --color-lagoon-900: #162e28;
+
+  /* Slate blue: links and the AI's "Suggested" marker. */
+  --color-tide-50: #e6eff3;
+  --color-tide-100: #cfe0e8;
+  --color-tide-500: #3f7a93;
+  --color-tide-600: #326780;
+  --color-tide-700: #28536a;
+  --color-tide-800: #1f4256;
+
+  /* Tailwind's own red, amber and green are used across the screens (about 60 places);
+     redefining them here recolours all of them at once. */
+  --color-red-50: #fdecee;
+  --color-red-100: #fad7db;
+  --color-red-200: #f2b4bc;
+  --color-red-300: #e58a96;
+  --color-red-400: #d4545f;
+  --color-red-500: #c2263a;
+  --color-red-600: #b3132c;
+  --color-red-700: #9c1127;
+  --color-red-800: #8a1022;
+  --color-red-900: #6e0c1b;
+  --color-red-950: #4a0711;
+
+  --color-amber-50: #fef8e3;
+  --color-amber-100: #fdf0c8;
+  --color-amber-200: #f7de96;
+  --color-amber-300: #eec85e;
+  --color-amber-400: #d9a53a;
+  --color-amber-500: #b7791f;
+  --color-amber-600: #96600f;
+  --color-amber-700: #8a5608;
+  --color-amber-800: #7c4c00;
+  --color-amber-900: #6b4200;
+  --color-amber-950: #3f2500;
+
+  --color-green-50: #e3f0eb;
+  --color-green-100: #cfe5dd;
+  --color-green-200: #a9cdbf;
+  --color-green-500: #3b7262;
+  --color-green-600: #36685a;
+  --color-green-700: #2a5449;
+  --color-green-800: #20423a;
+  --color-green-900: #162e28;
+
+  --radius-card: 1.25rem;
+}
+
+:root {
+  /* Hero cards: large white text only. */
+  --grad-hero: linear-gradient(135deg, #3b7262 0%, #2a5449 100%);
+  /* Buttons and small tiles: a small shift inside one hue, so small white text passes AA. */
+  --grad-action: linear-gradient(135deg, #36685a 0%, #2a5449 100%);
+  --grad-tile: linear-gradient(140deg, #4f8c7b 0%, #36685a 100%);
+  --grad-emergency: linear-gradient(150deg, #c2263a 0%, #b3132c 55%, #8e1030 100%);
+  /* Soft and diffuse, tinted with the brand green. */
+  --glow: 0 8px 22px -12px rgb(42 84 73 / 0.38);
+  --lift: 0 8px 28px -16px rgb(42 84 73 / 0.22), 0 1px 2px rgb(42 84 73 / 0.05);
+}
+
+body {
+  @apply bg-ink-50 text-ink-900 antialiased;
+  min-height: 100dvh;
+}
+/* Tailwind 4 gives buttons the default arrow; anything that can be clicked shows a hand. */
+button:not(:disabled), [role="button"], summary, select, label:has(> input[type="file"]) {
+  cursor: pointer;
+}
+/* The misty colour field behind the glass. A fixed layer, because iOS ignores fixed backgrounds.
+   Kept faint: cards are 70% white over it, and text contrast was checked on the darkest spot. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(110% 60% at 0% 0%, #d9e8e2 0%, transparent 55%),
+    radial-gradient(80% 50% at 100% 30%, #e6eff3 0%, transparent 60%),
+    radial-gradient(90% 45% at 30% 100%, #ece8dc 0%, transparent 60%),
+    radial-gradient(70% 40% at 80% 90%, #edf4f1 0%, transparent 60%),
+    #f6f3ec;
+}
+/* One focus ring for everything a keyboard can reach (buttons, links, tabs, card-buttons). */
+:focus-visible {
+  outline: 2px solid var(--color-tide-600);
+  outline-offset: 2px;
+}
+/* The default ring is nearly invisible on the dark gradient surfaces. */
+.hero :focus-visible, .tile:focus-visible {
+  outline-color: white;
+}
+/* Text inputs show their own lagoon ring on focus; skip the outline so there is no double ring. */
+.input:focus-visible {
+  outline: none;
+}
+
+/* In the components layer, so Tailwind utilities on an element can still override these. */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap text-white transition
+      hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100;
+    background: var(--grad-action);
+    box-shadow: var(--glow);
+  }
+  .btn-light {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/75 px-4 py-2 text-sm font-semibold whitespace-nowrap text-ink-800
+      ring-1 ring-ink-300 backdrop-blur transition hover:bg-white active:scale-[0.98] disabled:opacity-40;
+  }
+  /* Rare or risky actions (delete a visit, remove a person, stop a medicine): a quiet underlined text
+     link in neutral ink, never red, never a button. 44 px tall to tap. */
+  .link-quiet {
+    @apply inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 underline underline-offset-2 transition
+      hover:text-ink-800 disabled:opacity-40;
+  }
+  /* Thumb-sized on touch screens (44 px is the comfortable target; WCAG's floor is 24 px). */
+  @media (pointer: coarse) {
+    .btn, .btn-light {
+      min-height: 2.75rem;
+    }
+  }
+  .card {
+    @apply rounded-card border border-white/90 bg-white/70 p-5 backdrop-blur-xl backdrop-saturate-150;
+    box-shadow: var(--lift);
+  }
+  /* Solid white, no blur: the emergency card and the doctor page, where nothing may sit behind the text. */
+  .card-solid {
+    @apply rounded-card border border-ink-200 bg-white p-5;
+    box-shadow: var(--lift);
+  }
+  .hero {
+    @apply relative overflow-hidden rounded-card p-6 text-white;
+    background: var(--grad-hero);
+    box-shadow: 0 16px 36px -20px rgb(42 84 73 / 0.42);
+  }
+  /* Soft light in the top corner. */
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 16rem;
+    height: 16rem;
+    right: -5rem;
+    top: -6rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgb(255 255 255 / 0.16), transparent 65%);
+    pointer-events: none;
+  }
+  .hero > * {
+    position: relative;
+    z-index: 1;
+  }
+  .tile {
+    @apply grid size-10 shrink-0 place-items-center rounded-xl text-white;
+    background: var(--grad-tile);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+  .input {
+    @apply w-full rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-line-strong transition focus:ring-2 focus:ring-lagoon-600;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold text-ink-600;
+  }
+  .title {
+    @apply text-3xl font-bold tracking-tight text-ink-900;
+  }
+  .section-title {
+    @apply text-lg font-bold tracking-tight text-ink-900;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn-light, .input { transition: none; }
+}
