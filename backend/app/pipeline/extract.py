@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.pipeline.bills import from_imaging
 from app.pipeline.quotes import locate, quote_in_source
 from app.schemas.record import (
     EVENT_KINDS,
@@ -194,8 +195,14 @@ def apply_speaker_rules(item: ExtractedItem, source: SourceItem) -> tuple[EntryK
     but cannot create a diagnosis or a new prescription: a non-chronic "diagnosis" from the
     patient becomes a symptom, and a medicine the patient mentions (other than one they already
     take long-term) becomes a note.
+
+    A scan report (X-ray, CT, MRI, ultrasound) never makes a diagnosis: a "diagnosis" quoted from
+    one becomes a note labelled "Scan finding: ...", so it needs no confirmation and can never
+    reach the emergency card, whatever `chronic` says (policy in code, not the model).
     """
     if source.source_type == SourceType.IMAGE:
+        if item.kind == EntryKind.DIAGNOSIS and from_imaging(source, item.quote):
+            return EntryKind.NOTE, f"Scan finding: {item.label}", Speaker.DOCUMENT
         return item.kind, item.label, Speaker.DOCUMENT
     speaker = Speaker(item.said_by) if item.said_by != "document" else Speaker.DOCTOR
     if speaker == Speaker.PATIENT:

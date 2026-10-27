@@ -4,7 +4,7 @@ Run from the repo root:
 
     backend\\.venv\\Scripts\\python scripts\\make_demo_docs.py
 
-Writes two sets (see docs/testing-guide.md for what each one should show):
+Writes three sets (see docs/testing-guide.md for what each one should show):
 
 samples/demo-asha/ (the demo patient, who has a sulfa allergy in her record):
     prescription.png (a slightly skewed "phone photo"), bill.png, and documents.pdf (both
@@ -24,6 +24,11 @@ samples/test-meera/ (a patient you register yourself, who first adds a penicilli
     stay-discharge-summary.png, stay-hospital-bill.png: documents for a hospital stay she logs
     (10 to 13 Oct 2026). Home medicines become suggestions, those given in hospital notes; the
     discharge date is suggested; ceftriaxone on the bill is related to penicillin (amber).
+
+samples/test-scans/ (synthetic scan reports for Kabir Iyer, to test that scan findings are
+    not read as diagnoses): ct-chest-page1.png, ct-chest-page2.png and ct-chest.pdf (a CT
+    thorax with an impression and a recommendation), and mri-brain.png (an MRI brain). The
+    findings become results in words under one test, and the recommendation a follow-up.
 """
 
 from __future__ import annotations
@@ -296,6 +301,64 @@ def meera_tests() -> dict[str, Image.Image]:
     return {"visit4-prescription-tests.png": rx, "visit4-lab-report.png": report}
 
 
+def scan_reports() -> dict[str, Image.Image]:
+    """Radiology reports (a CT chest over two pages, an MRI brain on one) for a made-up patient,
+    to test how scan reports are read: mostly normal lines, a few abnormal findings, then an
+    impression and a recommendation. Clean printed pages."""
+    centre, address = "Lakeview Imaging Centre", "27 Hill View Road, Pune  |  Ph: 020-3333-0000  (synthetic)"
+    who = ["Patient: Kabir Iyer     Age/Sex: 58 / M     Study No: SYN-RAD-6120",
+           "Referred by: Dr. V. Nair, MD (Pulmonology)     Report date: 03/10/2026", ""]
+    sign = ["Dr. M. Fernandes", "MD, Consultant Radiologist   Reg. No. SYN-6006  (synthetic)"]
+    ct1 = text_page(centre, address, who + [
+        "HIGH RESOLUTION CT THORAX (PLAIN)", "",
+        "Technique:",
+        "  Plain axial HRCT of the thorax, 1 mm sections, no contrast given.",
+        "  Prone and expiratory images obtained as needed.", "",
+        "OBSERVATIONS:", "",
+        "Mediastinum:",
+        "  Trachea is normal in size and position.",
+        "  Cardiac silhouette is normal.",
+        "  Great vessels are normal in calibre.",
+        "  Enlarged right paratracheal lymph node, measuring 1.6 x 1.0 cm.",
+        "  No other mediastinal or hilar lymph node enlargement.",
+        "  A 0.5 cm hypodense lesion is seen in the left lobe of the thyroid.", "",
+        "Lungs and Pleura:",
+        "  Emphysematous changes are seen in both upper lobes.",
+        "  A 3 x 2 mm subpleural nodule is seen in the right upper lobe.",
+        "  No consolidation or ground glass opacity.",
+        "  Both main bronchi are patent.",
+        "  No evidence of pleural effusion.",
+        "  No pneumothorax.", "",
+        "(Continued on next page)"])
+    ct2 = text_page(centre, address, [
+        "Patient: Kabir Iyer     Study No: SYN-RAD-6120     Page 2 of 2", "",
+        "HIGH RESOLUTION CT THORAX (PLAIN)", "",
+        "IMPRESSION:", "",
+        "  - Centrilobular emphysema, predominantly involving both upper lobes.",
+        "  - Mediastinal lymphadenopathy (largest 1.6 x 1.0 cm, right paratracheal).",
+        "  - Incidental 3 mm subpleural nodule in the right upper lobe.",
+        "  - Hypodense lesion in the left thyroid lobe, likely colloid cyst.", "",
+        "RECOMMENDATION:",
+        "  Follow-up HRCT in 6 months. Ultrasound of the thyroid is advised.", "",
+        "", *sign])
+    mri = text_page(centre, address, who + [
+        "MRI BRAIN (PLAIN)", "",
+        "Technique:", "  T1, T2, FLAIR, DWI and SWI sequences in axial, coronal and sagittal planes.", "",
+        "OBSERVATIONS:", "",
+        "  A small focus with CSF signal is seen in the right corona radiata.",
+        "  Scattered periventricular and subcortical white matter T2 hyperintensities.",
+        "  Mild widening of the sulci and ventricles.",
+        "  No restricted diffusion to suggest an acute infarct.",
+        "  No intracranial haemorrhage or mass lesion.",
+        "  Midline structures are central. Posterior fossa is normal.", "",
+        "IMPRESSION:", "",
+        "  - Chronic lacunar infarct in the right corona radiata.",
+        "  - Fazekas grade 1 small vessel ischaemic changes.",
+        "  - Mild diffuse cerebral atrophy, age appropriate.", "",
+        "", *sign])
+    return {"ct-chest-page1.png": ct1, "ct-chest-page2.png": ct2, "mri-brain.png": mri}
+
+
 def save(folder: str, images: dict[str, Image.Image], pdf: str, pdf_pages: list[str]) -> None:
     out = SAMPLES / folder
     out.mkdir(parents=True, exist_ok=True)
@@ -310,6 +373,7 @@ def save(folder: str, images: dict[str, Image.Image], pdf: str, pdf_pages: list[
 def main() -> None:
     save("demo-asha", {**asha(), **asha_labs()}, "documents.pdf", ["prescription.png", "bill.png"])
     save("test-meera", meera(), "visit2.pdf", ["visit2-prescription.png", "visit2-bill.png"])
+    save("test-scans", scan_reports(), "ct-chest.pdf", ["ct-chest-page1.png", "ct-chest-page2.png"])
 
 
 if __name__ == "__main__":

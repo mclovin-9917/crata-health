@@ -104,11 +104,11 @@ export interface SourceItem {
   careful: boolean;
   recording_consent: boolean | null;
   /** Images only. Bills are read into bill lines, not suggestions. */
-  document_kind: "prescription" | "bill" | "report" | "other" | null;
+  document_kind: "prescription" | "bill" | "report" | "imaging" | "other" | null;
   /** PDFs only: page count, each page's text, and (multi-page) what each page is. */
   pages: number | null;
   page_texts: string[];
-  page_kinds: ("prescription" | "bill" | "report" | "other")[];
+  page_kinds: ("prescription" | "bill" | "report" | "imaging" | "other")[];
 }
 
 /** One line of a pharmacy bill: what was sold. Compared with the prescription by the checks. */

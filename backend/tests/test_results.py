@@ -477,3 +477,13 @@ def test_add_report_needs_a_test_of_that_visit(ctx):
     assert _add(client, enc.id, test_id=hb.id).status_code == 422  # a value is not a test
     client.patch(f"/entries/{cbc.id}", json={"action": "reject"})
     assert _add(client, enc.id, test_id=cbc.id).status_code == 422  # turned down
+
+
+@pytest.mark.parametrize("marker", ["- ", "* ", "\u2022 ", "\u2013 ", "1. ", "2) ", ""])
+def test_a_list_marker_is_not_kept_in_a_result_in_words(marker):
+    line = "Centrilobular emphysema, predominantly involving both upper lobes."
+    src = _source(f"IMPRESSION:\n{marker}{line}")
+    for text in (marker + line, line):  # validates with or without the marker
+        r = _result(name="Centrilobular emphysema", quote=marker + line, value=None,
+                    value_text=text, unit=None, ref_low=None, ref_high=None)
+        assert check_result(r, src) == TestResult(value_text=line)

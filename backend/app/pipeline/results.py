@@ -108,6 +108,17 @@ def _clean(text: str | None) -> str | None:
     return (text or "").strip() or None
 
 
+_MARKER = re.compile(r"^\s*(?:[-*•–—]|\d{1,2}[.)])\s+")
+
+
+def strip_marker(text: str | None) -> str | None:
+    """A list marker ('- ', '* ', a bullet, '1. ', '1) ') at the start of a result in words is
+    layout, not part of the finding. Applied after the checks, so validation is unchanged."""
+    if text is None:
+        return None
+    return _MARKER.sub("", text, count=1).strip() or text
+
+
 def check_result(r: ExtractedResult, source: SourceItem | None) -> TestResult | None:
     """The result's values if every check passes, else None."""
     if source is None or source.source_type != SourceType.IMAGE:
@@ -136,7 +147,7 @@ def check_result(r: ExtractedResult, source: SourceItem | None) -> TestResult | 
     ref_text = _clean(r.ref_text)
     if ref_text is not None and not quote_in_source(ref_text, r.quote):
         ref_text = None
-    return TestResult(value=value, value_text=text, unit=unit, ref_low=low, ref_high=high,
+    return TestResult(value=value, value_text=strip_marker(text), unit=unit, ref_low=low, ref_high=high,
                       ref_text=ref_text)
 
 

@@ -260,3 +260,68 @@ def test_a_pdf_with_a_prescription_and_a_bill_page():
     assert [(b.name, b.provenance.locator) for b in done.bill_lines] == [("Pantocid 40 Tab", "page 2")]
     extraction_input = next(c[2] for c in ai.calls if c[:2] == ("reason_json", "Extraction"))
     assert "Pantocid" not in extraction_input
+
+
+# ---- scan reports never make diagnoses ----
+SCAN = "HRCT THORAX\nIMPRESSION:\n- Centrilobular emphysema, predominantly involving both upper lobes."
+SCAN_QUOTE = "Centrilobular emphysema, predominantly involving both upper lobes."
+RX_DX = "Rx\nDiagnosis: Acute bronchitis\n1. Tab Augmentin 625 mg"
+
+
+def _dx(quote, label, source_id="doc1", chronic=False, said_by="document"):
+    from app.pipeline.extract import ExtractedItem
+    return ExtractedItem(kind=EntryKind.DIAGNOSIS, label=label, source_id=source_id, quote=quote,
+                         said_by=said_by, confidence=0.9, chronic=chronic)
+
+
+def _entry(item, source):
+    from datetime import date
+
+    from app.pipeline.extract import Extraction, to_entries
+    (entry,), failed = to_entries(Extraction(items=[item]), {item.source_id: source}, date(2026, 10, 3))
+    assert not failed
+    return entry
+
+
+def test_apply_kinds_keeps_imaging_for_a_photo_and_per_page():
+    pdf = SourceItem(source_type=SourceType.IMAGE, pages=2, page_texts=[RX, SCAN], text=f"{RX}\n\n{SCAN}")
+    photo = SourceItem(source_type=SourceType.IMAGE, text=SCAN)
+    parts = parts_of([photo, pdf])
+    sort = DocumentSort(documents=[
+        SortedDocument(source_id="doc1", kind="imaging"),
+        SortedDocument(source_id="doc2-page1", kind="prescription"),
+        SortedDocument(source_id="doc2-page2", kind="imaging"),
+    ])
+    apply_kinds(sort, parts)
+    assert photo.document_kind == DocumentKind.IMAGING
+    assert pdf.page_kinds == ["prescription", "imaging"]
+    assert extraction_text(photo) == SCAN  # still read (only bills are left out)
+
+
+def test_a_diagnosis_from_a_scan_photo_becomes_a_note():
+    from app.schemas.record import Tier
+    photo = SourceItem(source_type=SourceType.IMAGE, text=SCAN, document_kind=DocumentKind.IMAGING)
+    entry = _entry(_dx(SCAN_QUOTE, "Emphysema", chronic=True), photo)
+    assert entry.kind == EntryKind.NOTE and entry.label == "Scan finding: Emphysema"
+    assert entry.tier != Tier.EMERGENCY_CARD and entry.tier == Tier.FULL_RECORD
+
+
+def test_a_diagnosis_from_a_discharge_summary_stays():
+    summary = SourceItem(source_type=SourceType.IMAGE, text=RX_DX, document_kind=DocumentKind.REPORT)
+    entry = _entry(_dx("Diagnosis: Acute bronchitis", "Acute bronchitis"), summary)
+    assert entry.kind == EntryKind.DIAGNOSIS and entry.label == "Acute bronchitis"
+
+
+def test_in_a_mixed_pdf_only_the_scan_page_is_turned_into_notes():
+    pdf = SourceItem(source_type=SourceType.IMAGE, pages=2, page_texts=[RX_DX, SCAN],
+                     text=f"{RX_DX}\n\n{SCAN}", document_kind=DocumentKind.PRESCRIPTION,
+                     page_kinds=[DocumentKind.PRESCRIPTION, DocumentKind.IMAGING])
+    assert _entry(_dx("Diagnosis: Acute bronchitis", "Acute bronchitis"), pdf).kind == EntryKind.DIAGNOSIS
+    scan = _entry(_dx(SCAN_QUOTE, "Emphysema"), pdf)
+    assert scan.kind == EntryKind.NOTE and scan.label == "Scan finding: Emphysema"
+
+
+def test_a_diagnosis_from_a_consult_transcript_is_unchanged():
+    audio = SourceItem(source_type=SourceType.AUDIO, text="Doctor: this is acute bronchitis.")
+    entry = _entry(_dx("this is acute bronchitis", "Acute bronchitis", said_by="doctor"), audio)
+    assert entry.kind == EntryKind.DIAGNOSIS and entry.label == "Acute bronchitis"

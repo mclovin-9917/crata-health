@@ -159,6 +159,19 @@ def extraction_text(source: SourceItem) -> str | None:
     return None if source.document_kind == DocumentKind.BILL else source.text
 
 
+def from_imaging(source: SourceItem, quote: str) -> bool:
+    """Is this quote from a scan report? With page kinds, the pages that hold the quote must all
+    be imaging (a PDF can hold a prescription and a scan report); if no single page holds it,
+    or there are no page kinds, the document's own kind decides."""
+    whole = source.document_kind == DocumentKind.IMAGING
+    if source.page_kinds and len(source.page_kinds) == len(source.page_texts):
+        kinds = [k for t, k in zip(source.page_texts, source.page_kinds, strict=True)
+                 if quote_in_source(quote, t)]
+        if kinds:
+            return all(k == DocumentKind.IMAGING for k in kinds)
+    return whole
+
+
 def to_bill_lines(
     sort: DocumentSort, parts: dict[str, Part], ai: AIClient
 ) -> tuple[list[BillLine], list[str]]:

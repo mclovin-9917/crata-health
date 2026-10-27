@@ -342,7 +342,8 @@ class DocumentKind(str, Enum):
 
     PRESCRIPTION = "prescription"
     BILL = "bill"
-    REPORT = "report"  # lab or imaging report, discharge summary
+    REPORT = "report"  # lab report or discharge summary
+    IMAGING = "imaging"  # X-ray, CT, MRI, ultrasound, echo or other scan report
     OTHER = "other"
 
 
@@ -390,7 +391,7 @@ class SourceItem(BaseModel):
     reread_of: str | None = Field(default=None, description="The source this re-reads")
     careful: bool = Field(default=False, description="Documents read with thinking on")
     document_kind: DocumentKind | None = Field(
-        default=None, description="Documents only: prescription, bill, report or other"
+        default=None, description="Documents only: prescription, bill, report, imaging or other"
     )
     pages: int | None = Field(default=None, description="PDFs only: number of pages")
     page_texts: list[str] = Field(

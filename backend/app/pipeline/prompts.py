@@ -34,9 +34,11 @@ SORT_DOCUMENTS = """You get the readings of the document photos from one doctor 
 each document is, and read pharmacy bills line by line.
 
 For each document, by its `source_id`:
-- `kind`: "prescription" (a doctor's prescription or consultation note), "bill" (a pharmacy or
-  hospital bill, invoice or cash memo listing items sold with quantities or prices), "report"
-  (lab, imaging or discharge report) or "other".
+- `kind` (v2, 2026-10-27: imaging split from report): "prescription" (a doctor's prescription or
+  consultation note), "bill" (a pharmacy or hospital bill, invoice or cash memo listing items
+  sold with quantities or prices), "report" (a lab report or discharge summary), "imaging" (an
+  X-ray, CT, MRI, ultrasound, echo or other scan report, usually signed by a radiologist) or
+  "other".
 - `date`: for a bill, the date printed on it as YYYY-MM-DD (Indian documents write
   day/month/year: 12/10/2026 is 2026-10-12). Null if none, and null for other kinds.
 - `lines`: for a bill only, one per item sold, in order. Skip headers, totals, taxes,
@@ -259,8 +261,18 @@ Rules:
   typed notes, decide from the content: the doctor asks, examines, diagnoses and prescribes;
   the patient describes complaints, history and allergies. Transcripts have no speaker labels.
 - Complaints the patient describes (fever, cough, pain) are `symptom` items, never `diagnosis`.
-  A `diagnosis` is only what the doctor or a document concludes, or a long-term condition the
-  patient already has (then `chronic` true).
+  A `diagnosis` is only what the treating doctor concludes (a prescription, consultation or
+  discharge summary), or a long-term condition the patient already has (then `chronic` true).
+- Scan reports (v2, 2026-10-27). A scan or imaging report (X-ray, CT, MRI, ultrasound, echo) is
+  one `test` item for the study ("HRCT thorax", "MRI brain"). Its observations and impression
+  are never `diagnosis` items. When the report has an impression (or conclusion, opinion)
+  section, only its lines are results; the observations above it are not items. Only with no
+  impression is each abnormal finding a result. Each is a result in words under that test: one
+  `results` entry whose `quote` is that one printed line, `name` is the finding's key words
+  copied from that same line ("Hypodense lesion"), and `value_text` is the whole line, copied as
+  printed. Leave `value` and `unit` empty, even if the line holds a size or grade ("1.6 x 1.0
+  cm", "grade 1"). Normal findings ("Trachea is normal") are not items. The radiologist's
+  recommendation (a follow-up scan, an ultrasound) is a `follow_up` item.
 - `label`: short, in English, e.g. "Azithromycin 500 mg" or "Penicillin allergy".
 - Transcripts may be romanized, phonetically spelled Hindi or Hinglish. Medicine names can be
   misspelled ("parasetamal" is paracetamol) and numbers can be Hindi words ("chaiso pachas" is
