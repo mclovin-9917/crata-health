@@ -1,12 +1,12 @@
-import { AlertTriangle, ExternalLink, Lightbulb, Loader2, ShieldAlert, Stethoscope } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, Lightbulb, Loader2, ShieldAlert, Sparkles, Stethoscope } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { api, type AskAnswer, type AskCategory, type AskPoint, type AskSource } from "../api";
+import { api, type AskAnswer, type AskCategory, type AskPoint, type AskRecordItem, type AskSource } from "../api";
 import { useMe } from "../App";
 import { EmergencyNow } from "../assist";
 import { ErrorNote } from "../components";
 import { appendText, VoiceButton } from "../voice";
 
-const EXAMPLES = ["Is papaya good for me?", "What should I eat with high blood pressure?"];
+const EXAMPLES = ["What tablets am I taking for BP?", "Is papaya good for me?", "What should I eat with high blood pressure?"];
 const KEEP = 5;
 const storeKey = (personId: string) => `crata.askAnswers.${personId}`;
 
@@ -152,9 +152,14 @@ function sourcesOf(a: AskAnswer): AskSource[] {
 }
 
 function Answer({ answer: a }: { answer: AskAnswer }) {
-  const sources = sourcesOf(a);
+  const sources = a.kind === "record" ? [] : sourcesOf(a);
+  const recordItems = a.record_items ?? [];
+  const hasRecord = recordItems.length > 0 || !!a.record_summary;
+  const note = a.kind === "record" && !a.note
+    ? "From your confirmed record. Ask your doctor before changing any medicine."
+    : a.note;
   if (a.urgent) return <EmergencyNow signs={a.warning_signs} helpline={a.helpline} />;
-  if (!a.health_question) {
+  if (a.kind === "not_health" || (!a.kind && !a.health_question)) {
     return (
       <div className="card text-sm text-ink-700">
         This is not a health question, so there is nothing to look up. Try asking about food, diet or daily life.
@@ -173,10 +178,25 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
         </ul>
       )}
 
+      {hasRecord && (
+        <section className="card space-y-3" aria-label="From your record">
+          <h3 className="flex items-center gap-1.5 text-base font-bold tracking-tight text-ink-900">
+            <FileText size={16} className="text-ink-600" aria-hidden /> From your record
+          </h3>
+          {a.record_summary && <AiSummary text={a.record_summary} />}
+          {recordItems.length > 0 && (
+            <ul className="divide-y divide-ink-100">
+              {recordItems.map((it) => <RecordRow key={it.id} item={it} />)}
+            </ul>
+          )}
+        </section>
+      )}
+
       {a.points.length === 0 ? (
-        <div className="card text-sm text-ink-700">{a.note}</div>
+        !hasRecord && <div className="card text-sm text-ink-700">{note}</div>
       ) : (
         <div className="card space-y-5">
+          {a.summary && <AiSummary text={a.summary} />}
           {SECTIONS.map((sec) => {
             const items = a.points.filter((p) => (p.category ?? "good_to_know") === sec.key);
             if (items.length === 0) return null;
@@ -217,8 +237,39 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
       {a.considered.length > 0 && (
         <p className="text-sm text-ink-700">Searched with your condition: {a.considered.join(", ")}</p>
       )}
-      {a.points.length > 0 && <p className="rounded-2xl bg-ink-100 px-4 py-3 text-sm text-ink-700">{a.note}</p>}
+      {(a.points.length > 0 || hasRecord) && note && (
+        <p className="rounded-2xl bg-ink-100 px-4 py-3 text-sm text-ink-700">{note}</p>
+      )}
     </div>
+  );
+}
+
+function AiSummary({ text }: { text: string }) {
+  return (
+    <div className="space-y-1 border-l-2 border-l-ink-200 pl-3">
+      <span className="chip bg-tide-50 text-tide-800"><Sparkles size={12} aria-hidden /> AI summary</span>
+      <p className="text-sm text-ink-800">{text}</p>
+    </div>
+  );
+}
+
+const KIND_LABELS: Record<string, string> = {
+  medicine: "Medicine", allergy: "Allergy", condition: "Condition", diagnosis: "Condition", test: "Test", event: "Event",
+};
+
+function RecordRow({ item }: { item: AskRecordItem }) {
+  const allergy = item.kind === "allergy";
+  const label = KIND_LABELS[item.kind] ?? item.kind.charAt(0).toUpperCase() + item.kind.slice(1);
+  return (
+    <li className="flex flex-wrap items-start gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0">
+      <span className={`chip shrink-0 ${allergy ? "bg-red-50 text-red-800 ring-1 ring-red-200" : "bg-ink-100 text-ink-800"}`}>
+        {allergy && <ShieldAlert size={12} aria-hidden />} {label}
+      </span>
+      <span className="min-w-0 flex-1 basis-40 text-sm">
+        <span className="font-bold text-ink-900">{item.label}</span>
+        {item.detail && <span className="block text-ink-600">{item.detail}</span>}
+      </span>
+    </li>
   );
 }
 

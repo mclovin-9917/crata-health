@@ -14,11 +14,27 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from app.ai.client import AIError
 from app.ai.search import SearchError
 from app.api.routes import AI, DB, Search, _read_upload, own_patient
-from app.assist import DailyLimit, ask, prepare_visit, reserve_prep
+from app.assist import (
+    DailyLimit,
+    ask,
+    prepare_questions,
+    prepare_visit,
+    reserve_prep,
+    reserve_questions,
+    warning_signs,
+)
 from app.auth import Me
 from app.media import audio as audio_prep
 from app.pipeline import prompts
-from app.schemas.assist import AskAnswer, AskRequest, PrepRequest, VisitPrep, VoiceText
+from app.schemas.assist import (
+    AskAnswer,
+    AskRequest,
+    PrepRequest,
+    QuestionsRequest,
+    QuestionsResponse,
+    VisitPrep,
+    VoiceText,
+)
 
 router = APIRouter()
 
@@ -49,11 +65,24 @@ def create_visit_prep(patient_id: str, body: PrepRequest, db: DB, ai: AI, me: Me
         raise HTTPException(429, str(exc)) from exc
     try:
         prep = prepare_visit(patient, db.list_entries(patient_id), db.list_encounters(patient_id),
-                             body.symptoms, body.since or None, ai)
+                             body.symptoms, body.since or None, ai, answers=body.answers)
     except AIError as exc:
         raise HTTPException(502, _TRY_AGAIN) from exc
     db.save_visit_prep(prep)
     return prep
+
+
+@router.post("/patients/{patient_id}/visit-preps/questions")
+def visit_prep_questions(patient_id: str, body: QuestionsRequest, db: DB, ai: AI,
+                         me: Me) -> QuestionsResponse:
+    own_patient(db, me, patient_id)
+    if warning_signs(body.symptoms):  # urgent: no model, no limit used
+        return prepare_questions(body.symptoms, ai)
+    try:
+        reserve_questions(db, me.id)
+    except DailyLimit as exc:
+        raise HTTPException(429, str(exc)) from exc
+    return prepare_questions(body.symptoms, ai)
 
 
 @router.get("/patients/{patient_id}/visit-preps")

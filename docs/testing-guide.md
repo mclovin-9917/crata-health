@@ -182,7 +182,7 @@ Sign in as Asha first (she has readings and two lab reports already), then as Me
 Sign in as Asha. Each "Ask" that is not answered from the cache uses one Tavily search; keep this section to a few questions.
 
 - [ ] 8c.1 Home has two tiles, "Before a visit" and "Ask about my health".
-- [ ] 8c.2 Before a visit: type "Itchy red rash on both arms, worse at night. Mild fever yesterday.", since "4 days", "Make my summary". Within about 30 s: "Who to see" marked Suggested (a skin specialist or a general physician) with one line why and "A suggestion, not a diagnosis"; the summary lists both symptoms, your words in full, 4 days, the sulfa allergy in red, her medicines, conditions and test values outside their printed range, and up to 3 questions. Nothing tells you to start or stop a medicine.
+- [ ] 8c.2 Before a visit: type "Itchy red rash on both arms for 4 days, worse at night. Mild fever yesterday.", press Next. Up to 3 quick questions appear, each with tap answers and a box to type your own; answer one, then "Make my summary" ("Skip questions" goes straight on). Within about 30 s: "Who to see" marked Suggested (a skin specialist or a general physician) with one line why and "A suggestion, not a diagnosis"; the summary lists both symptoms, your words in full, 4 days, the sulfa allergy in red, her medicines, conditions and test values outside their printed range, and up to 3 questions. Nothing tells you to start or stop a medicine.
 - [ ] 8c.3 Print: only the summary card prints (no header, no buttons). Back on Before a visit, the summary is listed; Delete asks first, then removes it.
 - [ ] 8c.4 Type "Sudden chest pain and I can't breathe properly": the red "Get emergency care now" card comes first with both warning signs and "Call 112 or go to the nearest emergency department". "No chest pain, just a cough" does not show it.
 - [ ] 8c.5 Ask "Is salt bad for high blood pressure?": a few points, each with the site's name (NHS, Mayo Clinic, MedlinePlus, WHO, CDC) and "See the source" opening the exact words and the link; "Searched with your condition: Hypertension"; the grey note "General information ... not advice for you". Ask it again: the same answer, faster (no new search).
@@ -190,7 +190,8 @@ Sign in as Asha. Each "Ask" that is not answered from the cache uses one Tavily 
 - [ ] 8c.7 Sign out and sign in as Ravi: Ask shows none of Asha's questions.
 - [ ] 8c.8 Speak instead (on Before a visit and on Ask): allow the microphone, say a sentence, Stop. Within a few seconds the words appear in the box and can be edited; nothing is sent until you press the main button. Leave the screen while recording: the browser's mic indicator turns off.
 - [ ] 8c.9 Under an answer, "Ask a follow-up": "What about pickles?" after the salt question answers about pickles and blood pressure. Points sit under "Good to know", "Be careful" or "With your conditions"; each [n] opens the exact words, and "Sources" lists the sites by number.
-- [ ] 8c.10 The summary for the doctor reads as rows: symptoms, since, allergies (red chips), medicines and conditions (chips), recent events, tests out of range (name, value, High or Low, printed range, date), questions; "In my words" is folded but prints.
+- [ ] 8c.11 Ask "What tablets am I taking for BP?": a "From your record" card lists Amlodipine 5 mg (once a day), with no web sources; anything marked "AI summary" is at most two sentences.
+- [ ] 8c.10 The summary for the doctor reads as rows (with "Asked before the visit" holding your answers): symptoms, since, allergies (red chips), medicines and conditions (chips), recent events, tests out of range (name, value, High or Low, printed range, date), questions; "In my words" is folded but prints.
 
 ## 9. Emergency card and doctors
 

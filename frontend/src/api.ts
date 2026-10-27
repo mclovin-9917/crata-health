@@ -411,6 +411,15 @@ export interface OutOfRangeTest {
   range_text: string | null;
 }
 
+export interface PrepAnswer { question: string; answer: string }
+export interface PrepQuestion { id: string; text: string; choices: string[] }
+export interface PrepQuestions {
+  urgent: boolean;
+  warning_signs: string[];
+  helpline: string | null;
+  questions: PrepQuestion[];
+}
+
 /** Before a visit: a saved summary for the doctor. */
 export interface VisitPrep {
   id: string;
@@ -426,6 +435,7 @@ export interface VisitPrep {
   specialty_label: string;
   reason: string;
   questions: string[];
+  answers?: PrepAnswer[];
   record: {
     allergies: string[];
     medicines: string[];
@@ -449,8 +459,14 @@ export interface AskPoint {
 }
 export interface AskSource { n: number; site: string; title: string; url: string }
 
+export interface AskRecordItem { id: string; kind: string; label: string; detail: string }
+
 /** Ask about my health: an answer from trusted sites (not stored on the server). */
 export interface AskAnswer {
+  kind?: "record" | "general" | "both" | "not_health";
+  record_items?: AskRecordItem[];
+  record_summary?: string | null;
+  summary?: string | null;
   urgent: boolean;
   warning_signs: string[];
   helpline?: string | null;
@@ -585,8 +601,10 @@ export const api = {
   stepDown: (personId: string, patientId: string) =>
     request<TrustedPerson[]>(`/people/${personId}/trusted-by/${patientId}`, { method: "DELETE" }),
   meta: () => request<Meta>("/meta"),
-  createVisitPrep: (patientId: string, symptoms: string, since: string | null) =>
-    request<VisitPrep>(`/patients/${patientId}/visit-preps`, json("POST", { symptoms, since: since || null })),
+  prepQuestions: (patientId: string, symptoms: string) =>
+    request<PrepQuestions>(`/patients/${patientId}/visit-preps/questions`, json("POST", { symptoms })),
+  createVisitPrep: (patientId: string, symptoms: string, answers?: PrepAnswer[]) =>
+    request<VisitPrep>(`/patients/${patientId}/visit-preps`, json("POST", { symptoms, answers: answers ?? [] })),
   visitPreps: (patientId: string) => request<VisitPrep[]>(`/patients/${patientId}/visit-preps`),
   visitPrep: (id: string) => request<VisitPrep>(`/visit-preps/${id}`),
   deleteVisitPrep: (id: string) => request<void>(`/visit-preps/${id}`, { method: "DELETE" }),

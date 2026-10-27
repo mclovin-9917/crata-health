@@ -7,11 +7,15 @@
 - The summary for the doctor is assembled by code from what the patient typed and their confirmed
   record. The model only splits the typed words into symptoms (each with an exact quote that code
   checks), picks the kind of doctor, and suggests up to three questions.
-- Ask: the model turns the question into at most 8 general search words (code checks them: no
-  digits, no part of the patient's name), Tavily searches a fixed list of trusted sites, the model
-  writes points that each carry a source and an exact quote, and code keeps a point only if the
-  quote is in that source. Points that tell the reader to start, stop or skip a medicine, or that
-  name a dose, are dropped. Nothing from the record goes to a search.
+- Ask: the model sorts the question (record, general, both, not health). Record questions are
+  answered from the patient's confirmed record: the model only picks item ids that code built and
+  writes a short summary that code checks. General questions: the model turns the question into at
+  most 8 general search words (code checks them: no digits, no part of the patient's name), Tavily
+  searches a fixed list of trusted sites, the model writes points that each carry a source and an
+  exact quote, and code keeps a point only if the quote is in that source. Points, summaries and
+  follow-up questions that tell the reader to start, stop or skip a medicine, or that name a
+  dose, are dropped. Nothing from the record goes to a search. AI summaries are marked as such,
+  at most 2 sentences and 300 characters.
 - Search results are kept 30 days per query. Each account may ask 20 questions a day.
 """
 
@@ -22,7 +26,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
-from app.ai.client import AIClient
+from app.ai.client import AIClient, AIError
 from app.ai.search import SearchResult, WebSearch
 from app.medicine_info import DIRECTIVE, NOT_FOR_PATIENTS
 from app.pipeline import prompts
@@ -32,9 +36,13 @@ from app.schemas.assist import (
     AskPoint,
     AskPrevious,
     AskSource,
+    FollowUpQuestion,
     OutOfRangeTest,
+    PrepAnswer,
     PrepRecord,
     PrepSymptom,
+    QuestionsResponse,
+    RecordItem,
     VisitPrep,
 )
 from app.schemas.patient import Patient
@@ -223,6 +231,17 @@ class _Prep(BaseModel):
     specialty: str = "general_physician"
     reason: str = ""
     questions: list[str] = Field(default_factory=list)
+    since: str | None = None
+    since_quote: str | None = None
+
+
+class _FollowUp(BaseModel):
+    text: str
+    choices: list[str] = Field(default_factory=list)
+
+
+class _FollowUps(BaseModel):
+    questions: list[_FollowUp] = Field(default_factory=list)
 
 
 def _specialty_prompt() -> str:
@@ -307,25 +326,98 @@ def _clean_sentence(text: str) -> bool:
             and not DOSE.search(text))
 
 
+# Wider than INSTRUCTION: advice about a medicine in the AI summaries and follow-up questions.
+_MEDICINE_ADVICE = re.compile(
+    r"\b(keep|continue|carry\s+on)\s+taking\b|\byou\s+should\s+take\b|"
+    r"\btake\s+\w+\s+with\b|"
+    r"\b(increase|reduce|lower|raise|decrease)\s+(your|the)\s+\w+|\bswitch\s+to\b|"
+    r"\bchange\s+(your|the)\s+(medicines?|medications?|tablets?|pills?)\b|"
+    r"\bhave\s+you\s+tried\b", re.IGNORECASE)
+_YOU_ORDERS = re.compile(r"\byou\s+(should|must)\b", re.IGNORECASE)
+MAX_SUMMARY_CHARS = 300
+MAX_SUMMARY_SENTENCES = 2
+MAX_FOLLOW_UP_CHARS = 200
+
+
+def _medicine_names(labels: list[str]) -> list[str]:
+    names = []
+    for label in labels:
+        for word in re.findall(r"[^\W\d_]+", label):
+            if len(word) >= 3 and word.casefold() not in ("tablet", "tablets", "capsule", "syrup"):
+                names.append(word)
+                break
+    return names
+
+
+def _advice_free(text: str, medicines: list[str] | None = None) -> bool:
+    if not _clean_sentence(text) or _MEDICINE_ADVICE.search(text):
+        return False
+    return not any(re.search(rf"\bavoid\b\W+(\w+\W+){{0,3}}?{re.escape(n)}", text, re.IGNORECASE)
+                   for n in _medicine_names(medicines or []))
+
+
+def _summary_ok(text: str, medicines: list[str] | None = None) -> bool:
+    """An AI summary: at most 2 sentences and 300 characters, free of advice about medicines."""
+    sentences = [x for x in re.split(r"(?<=[.!?])\s+", text.strip()) if x.strip(" .!?")]
+    return (len(text) <= MAX_SUMMARY_CHARS and len(sentences) <= MAX_SUMMARY_SENTENCES
+            and not _YOU_ORDERS.search(text) and _advice_free(text, medicines))
+
+
+_YES = re.compile(r"^\W*(yes|yeah|yep|yup|haan|han|haa|ha|a\s+little|a\s+bit|sometimes|somewhat|"
+                  r"slightly|kabhi\s+kabhi)\b", re.IGNORECASE)
+_NO = re.compile(r"^\W*(no|nope|nah|never|none|not\s+really|nahi|nahin|nhi)\b", re.IGNORECASE)
+
+
+def _answers_clean(answers: list[PrepAnswer] | None) -> list[PrepAnswer]:
+    return [PrepAnswer(question=a.question.strip(), answer=a.answer.strip())
+            for a in (answers or []) if a.answer.strip()][:MAX_QUESTIONS]
+
+
+def _signs_in(text: str, answers: list[PrepAnswer]) -> list[str]:
+    """Warning signs in what was typed AND in each answer, in order, no repeats."""
+    # Every way the words can add up: the typed text and the answers joined; a short "yes" to a
+    # question that names a sign counts as that sign (the question goes in as a statement, so
+    # "stiff neck" plus yes to "Is there a fever?" is both); any other answer is read together
+    # with its question. A "no" never adds anything.
+    parts = [text, *(a.answer for a in answers)]
+    for a in answers:
+        if _YES.match(a.answer):
+            parts.append(a.question.rstrip(" ?"))
+        elif not _NO.match(a.answer):
+            parts.append(f"{a.question} {a.answer}")
+    out = warning_signs(text)
+    for chunk in (". ".join(parts), *parts[1:]):
+        out += [x for x in warning_signs(chunk) if x not in out]
+    return out
+
+
 def prepare_visit(patient: Patient, entries: list[Entry], encounters: list[Encounter],
                   text: str, since: str | None, ai: AIClient,
-                  today: date | None = None) -> VisitPrep:
+                  today: date | None = None,
+                  answers: list[PrepAnswer] | None = None) -> VisitPrep:
     """The saved-to-be summary. The model splits the typed words into symptoms, picks a kind of
-    doctor and suggests questions; everything else is code. May raise AIError."""
+    doctor, reads how long from the words and suggests questions; everything else is code. May
+    raise AIError."""
     today = today or date.today()
-    signs = warning_signs(text)
+    answers = _answers_clean(answers)
+    signs = _signs_in(text, answers)
     record = record_for(entries, encounters, today)
     used = getattr(ai, "used", [])  # which model answered (a backup is marked)
     used.clear()
     since_line = f"Since when: {since}\n" if since else ""
+    answers_block = ("\n\nThe patient's answers to follow-up questions:\n"
+                     + "\n".join(f"- {a.question}: {a.answer}" for a in answers)) if answers else ""
     answer = ai.reason_json(
         _specialty_prompt(),
-        f"{_record_text(patient, record, today)}\n\n{since_line}What the patient typed:\n{text}",
+        f"{_record_text(patient, record, today)}\n\n{since_line}What the patient typed:\n{text}"
+        f"{answers_block}",
         _Prep, max_tokens=4096, thinking=False, temperature=0.0)
 
+    # What the patient said: the typed words and the answers they gave.
+    said = "\n".join([text, *(a.answer for a in answers)])
     symptoms: list[PrepSymptom] = []
     for s in answer.symptoms:
-        if _clean_sentence(s.text) and quote_in_source(s.quote, text) and not any(
+        if _clean_sentence(s.text) and quote_in_source(s.quote, said) and not any(
                 k.text.casefold() == s.text.strip().casefold() for k in symptoms):
             symptoms.append(PrepSymptom(text=s.text.strip(), quote=s.quote))
     key = answer.specialty.strip() if answer.specialty.strip() in SPECIALTIES \
@@ -334,11 +426,49 @@ def prepare_visit(patient: Patient, entries: list[Entry], encounters: list[Encou
     if not reason or not _clean_sentence(reason):
         reason = FALLBACK_REASON
     questions = _unique([q for q in answer.questions if _clean_sentence(q)])[:MAX_QUESTIONS]
-    return VisitPrep(patient_id=patient.id, text=text, since=since or None, urgent=bool(signs),
+    when = (since or "").strip() or None  # an old client may still send it
+    if when is None and answer.since and answer.since_quote:
+        candidate = " ".join(answer.since.split())
+        if (len(candidate) <= 80 and _clean_sentence(candidate)
+                and quote_in_source(answer.since_quote, said)):
+            when = candidate
+    return VisitPrep(patient_id=patient.id, text=text, since=when, urgent=bool(signs),
                      warning_signs=signs, helpline=HELPLINE if _SELF_HARM in signs else None,
                      symptoms=symptoms, specialty=key,
                      specialty_label=SPECIALTIES[key], reason=reason, questions=questions,
-                     record=record, models_used=sorted(set(used)))
+                     answers=answers, record=record, models_used=sorted(set(used)))
+
+
+MAX_CHOICES = 4
+MAX_CHOICE_CHARS = 40
+
+
+def prepare_questions(text: str, ai: AIClient) -> QuestionsResponse:
+    """One round of follow-up questions. Warning signs first, by code: when there are any, no
+    model is called. A model failure gives no questions (the patient just goes on)."""
+    signs = warning_signs(text)
+    if signs:
+        return QuestionsResponse(urgent=True, warning_signs=signs,
+                                 helpline=HELPLINE if _SELF_HARM in signs else None)
+    used = getattr(ai, "used", [])
+    used.clear()
+    try:
+        got = ai.reason_json(prompts.PREPARE_QUESTIONS, f"What the patient typed:\n{text}",
+                             _FollowUps, max_tokens=2048, thinking=False, temperature=0.0)
+    except AIError:
+        return QuestionsResponse()
+    out: list[FollowUpQuestion] = []
+    for q in got.questions:
+        t = q.text.strip()
+        if (not t or len(t) > MAX_FOLLOW_UP_CHARS or not _advice_free(t)
+                or any(o.text.casefold() == t.casefold() for o in out)):
+            continue
+        choices = _unique([c for c in q.choices
+                           if len(c.strip()) <= MAX_CHOICE_CHARS and _advice_free(c)])
+        out.append(FollowUpQuestion(id=f"q{len(out) + 1}", text=t, choices=choices[:MAX_CHOICES]))
+        if len(out) == MAX_QUESTIONS:
+            break
+    return QuestionsResponse(questions=out)
 
 
 # ---- Ask about my health --------------------------------------------------------------------
@@ -377,9 +507,32 @@ def reserve_prep(db: Storage, account_id: str, now: datetime | None = None) -> N
     db.record_ask(key, now)
 
 
+QUESTIONS_PER_DAY = 40
+QUESTIONS_LIMIT_MESSAGE = (f"You've asked for questions {QUESTIONS_PER_DAY} times today. "
+                           "Try again tomorrow.")
+
+
+def reserve_questions(db: Storage, account_id: str, now: datetime | None = None) -> None:
+    """Count one round of follow-up questions (rolling 24 hours, key `prepq:<account id>`)."""
+    now = now or datetime.now(UTC)
+    key = f"prepq:{account_id}"
+    if db.count_asks(key, now - timedelta(days=1)) >= QUESTIONS_PER_DAY:
+        raise DailyLimit(QUESTIONS_LIMIT_MESSAGE)
+    db.record_ask(key, now)
+
+
 class _Plan(BaseModel):
-    health_question: bool
+    kind: str = "general"  # record | general | both | not_health
     search_words: str = ""
+
+
+class _RecordAnswer(BaseModel):
+    item_ids: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class _Summary(BaseModel):
+    summary: str = ""
 
 
 class _AskPoint(BaseModel):
@@ -492,6 +645,116 @@ def _previous_text(previous: AskPrevious | None) -> str:
 _CATEGORIES = ("good_to_know", "be_careful", "your_conditions")
 
 
+MAX_RECORD_EVENTS = 10
+MAX_RECORD_TESTS = 20
+RECORD_NOTE = "From your confirmed record. Ask your doctor before changing your medicines."
+RECORD_NONE_NOTE = "Your confirmed record doesn't show anything about this yet."
+_PER_DAY = {1.0: "once a day", 2.0: "twice a day", 3.0: "three times a day"}
+
+
+def _frequency(per_day: float | None) -> str:
+    if not per_day:
+        return ""
+    return _PER_DAY.get(float(per_day), f"{_g(per_day)} times a day")
+
+
+def record_items_for(entries: list[Entry], encounters: list[Encounter],
+                     today: date | None = None) -> list[RecordItem]:
+    """The patient's CONFIRMED record as numbered items (r1, r2, ...), built by code: current
+    medicines (dose and how often when known), allergies, conditions, recent events and the
+    latest value of each test with its range and date. The ids are what the model may point at."""
+    today = today or date.today()
+    rows: list[tuple[str, str, str]] = []  # kind, label, detail
+    for e in _latest(entries, encounters, EntryKind.MEDICATION):
+        m = e.medication
+        state = m.state(today) if m else MedicationState.END_UNKNOWN
+        if state in SHOWN_ON_CARD:
+            detail = ", ".join(x for x in (m.dose if m else None,
+                                           _frequency(m.doses_per_day) if m else "") if x)
+            rows.append(("medicine", e.label, detail))
+    for e in _latest(entries, encounters, EntryKind.ALLERGY):
+        rows.append(("allergy", e.label, ""))
+    for e in _latest(entries, encounters, EntryKind.DIAGNOSIS):
+        rows.append(("condition", e.label, ""))
+    confirmed = [e for e in entries
+                 if e.status == EntryStatus.CONFIRMED]
+    cutoff = (today - timedelta(days=RECENT_DAYS)).isoformat()
+    events = [e for e in timeline(confirmed)
+              if e.occurred_on and e.occurred_on >= cutoff[:len(e.occurred_on)]]
+    for e in events[:MAX_RECORD_EVENTS]:
+        rows.append(("event", e.label, e.occurred_on or ""))
+    tests = 0
+    for group in numbers(entries, encounters).groups:
+        for series in group.series:
+            p = series.latest
+            if p is None or tests >= MAX_RECORD_TESTS:
+                continue
+            unit = f" {p.unit}" if p.unit else ""
+            detail = f"{_g(p.value)}{unit} on {p.on.isoformat()}"
+            if p.range is not None and (p.range.low is not None or p.range.high is not None):
+                low, high = p.range.low, p.range.high
+                printed = (f"{_g(low)} to {_g(high)}" if low is not None and high is not None
+                           else f"up to {_g(high)}" if high is not None else f"from {_g(low)}")
+                detail += f" (printed range {printed}"
+                detail += f", {p.position})" if p.position in ("low", "high") else ")"
+            rows.append(("test", series.name, detail))
+            tests += 1
+    seen: set[tuple[str, str, str]] = set()
+    items: list[RecordItem] = []
+    for kind, label, detail in rows:
+        key = (kind, label.casefold(), detail)
+        if not label.strip() or key in seen:
+            continue
+        seen.add(key)
+        items.append(RecordItem(id=f"r{len(items) + 1}", kind=kind, label=label.strip(),
+                                detail=detail))
+    return items
+
+
+def _record_list(items: list[RecordItem]) -> str:
+    return "\n".join(f"{i.id}. [{i.kind}] {i.label}{': ' + i.detail if i.detail else ''}"
+                     for i in items)
+
+
+def _record_part(question: str, items: list[RecordItem], ai: AIClient,
+                 context: str) -> tuple[list[RecordItem], str | None]:
+    """Which record items answer the question, and a short summary from them. Ids the model
+    invents are dropped; the items come from the record, never from model text."""
+    if not items:
+        return [], None
+    got = ai.reason_json(
+        prompts.ASK_RECORD,
+        f"{context}Question: {question}\n\nThe patient's confirmed record:\n{_record_list(items)}",
+        _RecordAnswer, max_tokens=2048, thinking=False, temperature=0.0)
+    by_id = {i.id: i for i in items}
+    kept: list[RecordItem] = []
+    for item_id in got.item_ids:
+        item = by_id.get(item_id.strip())
+        if item is not None and item not in kept:
+            kept.append(item)
+    if not kept:  # nothing from the record answers it: no summary either
+        return [], None
+    summary = " ".join(got.summary.split())
+    names = [i.label for i in items if i.kind == "medicine"]
+    return kept, (summary if summary and _summary_ok(summary, names) else None)
+
+
+def _summary_of_points(question: str, points: list[AskPoint], ai: AIClient,
+                       medicines: list[str] | None = None) -> str | None:
+    """A 2-sentence summary written from the kept points' text only (not the sources)."""
+    if not points:
+        return None
+    try:
+        got = ai.reason_json(
+            prompts.ASK_SUMMARY,
+            f"Question: {question}\n\nPoints:\n" + "\n".join(f"- {p.text}" for p in points),
+            _Summary, max_tokens=1024, thinking=False, temperature=0.0)
+    except AIError:
+        return None
+    text = " ".join(got.summary.split())
+    return text if text and _summary_ok(text, medicines) else None
+
+
 def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], question: str,
         account_id: str, db: Storage, ai: AIClient, search: WebSearch,
         now: datetime | None = None, previous: AskPrevious | None = None) -> AskAnswer:
@@ -510,26 +773,54 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
     context = _previous_text(previous)
     plan = ai.reason_json(prompts.ASK_SEARCH, f"{context}Question: {question}", _Plan,
                           max_tokens=1024, thinking=False, temperature=0.0)
-    if not plan.health_question:
-        return AskAnswer(health_question=False, note=NOT_HEALTH_NOTE,
+    kind = plan.kind.strip().casefold()
+    if kind not in ("record", "general", "both", "not_health"):
+        kind = "general"
+    if kind == "not_health":
+        return AskAnswer(kind="not_health", health_question=False, note=NOT_HEALTH_NOTE,
                          models_used=sorted(set(used)))
-    words = " ".join(plan.search_words.split())
-    if not check_search_words(words, patient.name):
-        return AskAnswer(note=GENERAL_WORDS_NOTE, models_used=sorted(set(used)))
 
-    record = record_for(entries, encounters, now.date())
-    results, searched = cached_search(words + SEARCH_SUFFIX, db, search, now)
-    results = [r for r in results if not NOT_FOR_PATIENTS.search(r.url)]
+    out = AskAnswer(kind=kind, note=ASK_NOTE)  # type: ignore[arg-type]
+    today = now.date()
+    record = record_for(entries, encounters, today)
+    searched = False
 
     def models() -> list[str]:
         return [*sorted(set(used)), *(["tavily:search"] if searched else [])]
 
-    base = AskAnswer(allergy_notes=allergy_notes(record.allergies, question),
-                     considered=considered_conditions(record.conditions, words), note=ASK_NOTE)
+    if kind in ("record", "both"):
+        try:
+            out.record_items, out.record_summary = _record_part(
+                question, record_items_for(entries, encounters, today), ai, context)
+        except AIError:
+            if kind == "record":
+                raise
+        if kind == "record":
+            out.note = RECORD_NOTE if out.record_items else RECORD_NONE_NOTE
+            out.allergy_notes = allergy_notes(record.allergies, question)
+            out.models_used = models()
+            return out
+
+    words = " ".join(plan.search_words.split())
+    if not check_search_words(words, patient.name):
+        if kind == "both" and out.record_items:  # the record part alone is still an answer
+            out.note = RECORD_NOTE
+            out.allergy_notes = allergy_notes(record.allergies, question)
+            out.models_used = models()
+            return out
+        out.note = GENERAL_WORDS_NOTE
+        out.models_used = models()
+        return out
+
+    results, searched = cached_search(words + SEARCH_SUFFIX, db, search, now)
+    results = [r for r in results if not NOT_FOR_PATIENTS.search(r.url)]
+    out.allergy_notes = allergy_notes(record.allergies, question)
+    out.considered = considered_conditions(record.conditions, words)
     if not results:
-        base.note = NO_ANSWER_NOTE
-        base.models_used = models()
-        return base
+        out.note = ((RECORD_NOTE if kind == "both" else ASK_NOTE) if out.record_items
+                    else NO_ANSWER_NOTE)
+        out.models_used = models()
+        return out
 
     facts = "\n".join(f"{label}: {'; '.join(items) or 'none in the record'}" for label, items in (
         ("Conditions", record.conditions), ("Allergies", record.allergies),
@@ -546,14 +837,14 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         r = results[p.source - 1]
         if not quote_in_source(p.quote, r.content):
             continue
-        if any(k.text.casefold() == text.casefold() for k in base.points):
+        if any(k.text.casefold() == text.casefold() for k in out.points):
             continue
-        if len(base.points) < MAX_ASK_POINTS:
-            n = next((s.n for s in base.sources if s.url == r.url), 0)
+        if len(out.points) < MAX_ASK_POINTS:
+            n = next((s.n for s in out.sources if s.url == r.url), 0)
             if not n:
-                n = len(base.sources) + 1
-                base.sources.append(AskSource(n=n, site=_site_name(r.url), title=r.title,
-                                              url=r.url))
+                n = len(out.sources) + 1
+                out.sources.append(AskSource(n=n, site=_site_name(r.url), title=r.title,
+                                             url=r.url))
             category = p.category.strip().casefold()
             # "With your conditions" only when the point itself names one of the patient's
             # confirmed conditions (same names and everyday words as the search check).
@@ -561,9 +852,12 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
                     category == "your_conditions"
                     and not considered_conditions(record.conditions, f"{text} {p.quote}")):
                 category = "good_to_know"
-            base.points.append(AskPoint(category=category, source=n, text=text, quote=p.quote,
-                                        site=_site_name(r.url), title=r.title, url=r.url))
-    if not base.points:
-        base.note = NO_ANSWER_NOTE
-    base.models_used = models()
-    return base
+            out.points.append(AskPoint(category=category, source=n, text=text, quote=p.quote,
+                                       site=_site_name(r.url), title=r.title, url=r.url))
+    if not out.points:
+        out.note = (NO_ANSWER_NOTE if not out.record_items
+                    else RECORD_NOTE if kind == "both" else ASK_NOTE)
+    else:
+        out.summary = _summary_of_points(question, out.points, ai, record.medicines)
+    out.models_used = models()
+    return out

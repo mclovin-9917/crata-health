@@ -3,6 +3,7 @@
 import io
 import wave
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -17,8 +18,12 @@ from app.assist import (
     _Answer,
     _AskPoint,
     _clean_sentence,
+    _FollowUp,
+    _FollowUps,
     _Plan,
     _Prep,
+    _RecordAnswer,
+    _Summary,
     _Symptom,
     check_search_words,
     considered_conditions,
@@ -50,8 +55,8 @@ RESULTS = [
 ]
 
 
-def _plan(words="diabetes rice", health=True):
-    return _Plan(health_question=health, search_words=words)
+def _plan(words="diabetes rice", kind="general"):
+    return _Plan(kind=kind, search_words=words)
 
 
 def _pt(text, source, quote, category="good_to_know"):
@@ -81,8 +86,18 @@ PREP = _Prep(
 class FakeAI:
     """Answers by what is asked for; counts calls."""
 
-    def __init__(self, plan=None, answer=ANSWER, prep=PREP, fail=False):
+    def __init__(self, plan=None, answer=ANSWER, prep=PREP, fail=False, follow=None,
+                 record=None, summary=None, fail_on=()):
         self.plan, self.answer, self.prep, self.fail = plan or _plan(), answer, prep, fail
+        self.follow = follow or _FollowUps(questions=[
+            _FollowUp(text="Where exactly is it?", choices=["Left", "Right", "Both", "Not sure",
+                                                           "Other"]),
+            _FollowUp(text="Is there a fever?", choices=[]),
+            _FollowUp(text="Should I stop my tablets?", choices=["Yes"]),
+            _FollowUp(text="Since when?", choices=["Stop now", "2 days"]),
+            _FollowUp(text="Fourth?", choices=[])])
+        self.record = record or _RecordAnswer(item_ids=["r1"], summary="You take one medicine.")
+        self.summary, self.fail_on = summary or _Summary(summary="Rice raises blood sugar."), fail_on
         self.calls, self.used, self.kw, self.users = [], [], [], []
         self.voice, self.voice_calls = "I have a cough", []
 
@@ -97,10 +112,12 @@ class FakeAI:
         self.calls.append(schema.__name__)
         self.kw.append(kw)
         self.users.append(user)
-        if self.fail:
+        if self.fail or schema.__name__ in self.fail_on:
             raise AIError("busy")
         self.used.append("nvidia:super")
-        return {"_Plan": self.plan, "_Answer": self.answer, "_Prep": self.prep}[schema.__name__]
+        return {"_Plan": self.plan, "_Answer": self.answer, "_Prep": self.prep,
+                "_FollowUps": self.follow, "_RecordAnswer": self.record,
+                "_Summary": self.summary}[schema.__name__]
 
 
 class FakeSearch:
@@ -249,7 +266,7 @@ def test_prep_is_assembled_by_code_and_saved():
     body = r.json()
     assert set(body) == {"id", "patient_id", "created_at", "text", "since", "urgent",
                          "warning_signs", "symptoms", "specialty", "specialty_label", "reason",
-                         "questions", "record", "models_used", "helpline"}
+                         "questions", "answers", "record", "models_used", "helpline"}
     assert body["text"] == "I have had a cough for a week" and body["since"] == "a week"
     assert body["urgent"] is False and body["warning_signs"] == []
     # The quote check keeps only what was typed.
@@ -272,7 +289,7 @@ def test_prep_is_assembled_by_code_and_saved():
     assert len(body["record"]["out_of_range"]) == 1
     assert body["record"]["out_of_range"][0].startswith("HbA1c 8.2 %")
     assert "high" in body["record"]["out_of_range"][0]
-    assert body["models_used"] == ["nvidia:super"]
+    assert body["models_used"] == ["nvidia:super"] and body["answers"] == []
     assert ai.calls == ["_Prep"] and ai.kw[0]["thinking"] is False
     assert db.get_visit_prep(body["id"]) is not None
 
@@ -396,7 +413,10 @@ def test_ask_keeps_only_points_the_source_backs():
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"urgent", "warning_signs", "health_question", "points", "sources",
-                         "allergy_notes", "considered", "note", "models_used", "helpline"}
+                         "allergy_notes", "considered", "note", "models_used", "helpline",
+                         "kind", "record_items", "record_summary", "summary"}
+    assert body["kind"] == "general" and body["record_items"] == []
+    assert body["record_summary"] is None and body["summary"] == "Rice raises blood sugar."
     assert [p["text"] for p in body["points"]] == [
         "Rice is a starchy food that raises blood sugar.",
         "Brown rice has more fibre than white rice.",
@@ -418,8 +438,11 @@ def test_ask_keeps_only_points_the_source_backs():
     assert body["models_used"] == ["nvidia:super", "tavily:search"]
     ((query, domains, _),) = search.queries
     assert query == "diabetes rice diet health" and domains == HEALTH_DOMAINS
-    assert ai.calls == ["_Plan", "_Answer"]
+    assert ai.calls == ["_Plan", "_Answer", "_Summary"]
     assert ai.kw[0]["thinking"] is False and ai.kw[0]["temperature"] == 0.0
+    # The summary is written from the kept points only, never from the sources.
+    assert "Brown rice has more fibre than white rice." in ai.users[2]
+    assert "Rice is good for everyone" not in ai.users[2] and "nhs.uk" not in ai.users[2]
 
 
 def test_ask_notes_an_allergy_named_in_the_question():
@@ -460,9 +483,10 @@ def test_urgent_ask_makes_no_model_or_search_call_and_uses_no_question():
 
 
 def test_not_a_health_question_makes_no_search():
-    _, ai, search, client = _world(plan=_plan(words="", health=False))
+    _, ai, search, client = _world(plan=_plan(words="", kind="not_health"))
     body = _ask(client, "Who won the cricket match?").json()
     assert body["health_question"] is False and body["points"] == []
+    assert body["kind"] == "not_health"
     assert search.queries == [] and ai.calls == ["_Plan"]
 
 
@@ -745,3 +769,336 @@ def test_transcribe_uses_omni_with_thinking_off_and_no_backup():
     assert call["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
     assert call["messages"][0]["content"][0] == audio_part(b"wav")
     assert ai.transcribe(b"wav", "write it") == ""  # silence is allowed
+
+
+# ---- one box, follow-up questions -----------------------------------------------------------
+def _questions(client, text="my stomach hurts"):
+    return client.post(f"/patients/{PID}/visit-preps/questions", json={"symptoms": text})
+
+
+def test_follow_up_questions_are_filtered_and_numbered():
+    db, ai, _, client = _world()
+    r = _questions(client)
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"urgent", "warning_signs", "helpline", "questions"}
+    assert body["urgent"] is False and body["warning_signs"] == [] and body["helpline"] is None
+    # "Should I stop my tablets?" is dropped; at most 3; choices capped at 4 and filtered.
+    assert body["questions"] == [
+        {"id": "q1", "text": "Where exactly is it?", "choices": ["Left", "Right", "Both",
+                                                                   "Not sure"]},
+        {"id": "q2", "text": "Is there a fever?", "choices": []},
+        {"id": "q3", "text": "Since when?", "choices": ["2 days"]}]  # "Stop now" dropped
+    assert ai.calls == ["_FollowUps"]
+    account = client.app.state.storage.account_by_person(PID)
+    assert db.count_asks(f"prepq:{account.id}", datetime.now(UTC) - timedelta(days=1)) == 1
+
+
+def test_follow_up_questions_urgent_makes_no_model_call_and_uses_no_limit():
+    db, ai, _, client = _world()
+    body = _questions(client, "I have chest pain").json()
+    assert body["urgent"] is True and body["warning_signs"] == ["Chest pain or pressure"]
+    assert body["questions"] == [] and ai.calls == []
+    account = client.app.state.storage.account_by_person(PID)
+    assert db.count_asks(f"prepq:{account.id}", datetime.now(UTC) - timedelta(days=1)) == 0
+    assert _questions(client, "I want to end my life").json()["helpline"].startswith("Tele-MANAS")
+
+
+def test_follow_up_questions_model_failure_gives_none_not_an_error():
+    _, _, _, client = _world(fail=True)
+    r = _questions(client)
+    assert r.status_code == 200 and r.json()["questions"] == []
+
+
+def test_follow_up_questions_limit_is_40_per_account():
+    _, _, _, client = _world()
+    for _i in range(40):
+        assert _questions(client).status_code == 200
+    r = _questions(client)
+    assert r.status_code == 429
+    assert r.json()["detail"] == "You've asked for questions 40 times today. Try again tomorrow."
+    assert client.post(f"/patients/{PID}/visit-preps", json={"symptoms": "cough"}).status_code == 200
+
+
+def test_follow_up_questions_input_limits():
+    _, _, _, client = _world()
+    assert _questions(client, "").status_code == 422
+    assert _questions(client, "x" * 2001).status_code == 422
+
+
+def test_prep_needs_no_since_and_reads_it_from_the_text():
+    prep = _Prep(symptoms=[], specialty="lungs", reason="Chest doctors see lasting coughs.",
+                 since="about a week", since_quote="for a week")
+    _, ai, _, client = _world(prep=prep)
+    body = client.post(f"/patients/{PID}/visit-preps",
+                       json={"symptoms": "I have had a cough for a week"}).json()
+    assert body["since"] == "about a week"
+    assert "Since when" not in ai.users[0]
+    # A quote that is not in the typed words: the model's "since" is dropped.
+    prep = _Prep(symptoms=[], since="3 days", since_quote="for three days")
+    _, _, _, client = _world(prep=prep)
+    assert client.post(f"/patients/{PID}/visit-preps",
+                       json={"symptoms": "cough"}).json()["since"] is None
+    # An old client's own "since" is kept as before.
+    assert client.post(f"/patients/{PID}/visit-preps",
+                       json={"symptoms": "cough", "since": "a week"}).json()["since"] == "a week"
+
+
+def test_prep_answers_go_to_the_prompt_are_saved_and_checked_for_warning_signs():
+    db, ai, _, client = _world()
+    answers = [{"question": "Where exactly?", "answer": "Left side"},
+               {"question": "Fever?", "answer": "  "}]  # an empty answer is dropped
+    body = client.post(f"/patients/{PID}/visit-preps",
+                       json={"symptoms": "my stomach hurts", "answers": answers}).json()
+    assert body["answers"] == [{"question": "Where exactly?", "answer": "Left side"}]
+    assert "- Where exactly?: Left side" in ai.users[0] and "Fever?" not in ai.users[0]
+    assert db.get_visit_prep(body["id"]).answers[0].answer == "Left side"
+    assert body["urgent"] is False
+    # A warning sign only in an answer still leads the summary.
+    body = client.post(f"/patients/{PID}/visit-preps", json={
+        "symptoms": "my stomach hurts",
+        "answers": [{"question": "Anything else?", "answer": "also some chest pain"}]}).json()
+    assert body["urgent"] is True and body["warning_signs"] == ["Chest pain or pressure"]
+
+
+def test_prep_answer_limits():
+    _, _, _, client = _world()
+    url = f"/patients/{PID}/visit-preps"
+    ok = {"question": "q", "answer": "a"}
+    assert client.post(url, json={"symptoms": "cough", "answers": [ok] * 3}).status_code == 200
+    assert client.post(url, json={"symptoms": "cough", "answers": [ok] * 4}).status_code == 422
+    assert client.post(url, json={"symptoms": "cough", "answers": [
+        {"question": "q" * 201, "answer": "a"}]}).status_code == 422
+    assert client.post(url, json={"symptoms": "cough", "answers": [
+        {"question": "q", "answer": "a" * 201}]}).status_code == 422
+
+
+def test_an_older_saved_prep_without_answers_loads():
+    from app.schemas.assist import VisitPrep
+
+    prep = VisitPrep.model_validate({"patient_id": PID, "text": "cough"})
+    assert prep.answers == []
+
+
+# ---- Ask: from the record, with a summary -----------------------------------------------------
+def test_a_record_question_uses_the_record_only_and_never_searches():
+    rec = _RecordAnswer(item_ids=["r1", "r999", "r1"], summary="You take metformin for diabetes.")
+    _, ai, search, client = _world(plan=_plan(words="", kind="record"), record=rec)
+    body = _ask(client, "what tablets am I taking for BP?").json()
+    assert body["kind"] == "record" and body["health_question"] is True
+    assert search.queries == [] and ai.calls == ["_Plan", "_RecordAnswer"]
+    # r1 is the current medicine; the invented id and the repeat are dropped.
+    assert body["record_items"] == [{"id": "r1", "kind": "medicine", "label": "Metformin 500 mg",
+                                     "detail": ""}]
+    assert body["record_summary"] == "You take metformin for diabetes."
+    assert body["points"] == [] and body["sources"] == [] and body["summary"] is None
+    assert body["models_used"] == ["nvidia:super"]  # no tavily
+    assert "r1. [medicine] Metformin 500 mg" in ai.users[1]
+    assert "Old antibiotic" not in ai.users[1]  # a finished course is not in the list
+    assert "HbA1c" in ai.users[1] and "up to 5.6" in ai.users[1] and "high" in ai.users[1]
+
+
+def test_record_items_come_from_confirmed_entries_with_dose_and_frequency():
+    db, _, _, client = _world(plan=_plan(words="", kind="record"),
+                              record=_RecordAnswer(item_ids=["r1", "r2", "r3", "r4"]))
+    e = Entry(patient_id=PID, kind=EntryKind.MEDICATION, label="Amlodipine",
+              medication=Medication(dose="5 mg", doses_per_day=1, ongoing=True))
+    e.set_status(EntryStatus.CONFIRMED, by="system")
+    db.save_entry(e)
+    proposed = Entry(patient_id=PID, kind=EntryKind.DIAGNOSIS, label="Secret proposal")
+    db.save_entry(proposed)  # not confirmed
+    items = _ask(client, "what do I take?").json()["record_items"]
+    assert {"id": "r2", "kind": "medicine", "label": "Amlodipine",
+            "detail": "5 mg, once a day"} in items
+    assert all("Secret" not in i["label"] for i in items)
+    assert {i["kind"] for i in items} <= {"medicine", "allergy", "condition", "event", "test"}
+
+
+def test_record_question_with_an_empty_record_makes_no_record_model_call():
+    db = Storage()
+    db.save_patient(Patient(id=PID, name="Asha Verma (synthetic)"))
+    ai = FakeAI(plan=_plan(words="", kind="record"))
+    client = api_client(create_app(db, ai, FakeSearch()), person=PID)
+    body = _ask(client, "what tablets do I take?").json()
+    assert body["record_items"] == [] and body["record_summary"] is None
+    assert "doesn't show anything" in body["note"] and ai.calls == ["_Plan"]
+
+
+@pytest.mark.parametrize("summary", ["Please stop taking metformin.", "Take 500 mg daily.",
+                                     "Change the dose.", ""])
+def test_a_record_summary_with_a_directive_or_dose_is_dropped(summary):
+    rec = _RecordAnswer(item_ids=["r1"], summary=summary)
+    _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)
+    body = _ask(client, "what do I take?").json()
+    assert body["record_summary"] is None and len(body["record_items"]) == 1
+
+
+def test_a_both_question_gives_record_items_and_points():
+    _, ai, search, client = _world(plan=_plan(kind="both"))
+    body = _ask(client, "can I eat rice with my tablets?").json()
+    assert body["kind"] == "both"
+    assert [i["id"] for i in body["record_items"]] == ["r1"]
+    assert body["record_summary"] == "You take one medicine."
+    assert len(body["points"]) == 3 and body["summary"] == "Rice raises blood sugar."
+    assert len(search.queries) == 1
+    assert ai.calls == ["_Plan", "_RecordAnswer", "_Answer", "_Summary"]
+    assert body["models_used"] == ["nvidia:super", "tavily:search"]
+    # Nothing from the record went to the search.
+    assert "Metformin" not in search.queries[0][0]
+
+
+def test_a_both_question_with_unsafe_search_words_still_gives_the_record_part():
+    _, _, search, client = _world(plan=_plan(words="asha rice", kind="both"))
+    body = _ask(client, "can I eat rice with my tablets?").json()
+    assert search.queries == [] and body["record_items"] and body["points"] == []
+
+
+@pytest.mark.parametrize("text", ["Rice is fine, so stop taking tablets.", "Eat 500 mg of rice.",
+                                  "You should skip it."])
+def test_a_summary_with_a_directive_or_dose_is_dropped(text):
+    _, _ai, _, client = _world(summary=_Summary(summary=text))
+    body = _ask(client).json()
+    assert body["summary"] is None and len(body["points"]) == 3
+
+
+def test_summary_is_null_with_no_points_and_makes_no_summary_call():
+    _, ai, _, client = _world(answer=_Answer(points=[_pt("Not in source.", 1, "nope nope")]))
+    body = _ask(client).json()
+    assert body["points"] == [] and body["summary"] is None
+    assert ai.calls == ["_Plan", "_Answer"]
+
+
+def test_a_failed_summary_call_leaves_the_points():
+    _, _, _, client = _world(fail_on=("_Summary",))
+    body = _ask(client).json()
+    assert len(body["points"]) == 3 and body["summary"] is None
+
+
+def test_a_record_question_still_checks_warning_signs_and_the_limit():
+    _, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    assert _ask(client, "what is my chest pain medicine?").json()["urgent"] is True
+    assert ai.calls == []
+    for _i in range(ASKS_PER_DAY):
+        assert _ask(client, "what do I take?").status_code == 200
+    assert _ask(client, "what do I take?").status_code == 429
+
+
+# ---- review fixes: warning signs in answers, summaries, follow-up filters ---------------------
+def _prep_signs(client, text, answers):
+    body = client.post(f"/patients/{PID}/visit-preps",
+                       json={"symptoms": text, "answers": answers}).json()
+    return body["urgent"], body["warning_signs"]
+
+
+def test_a_yes_to_a_question_that_names_a_sign_is_urgent():
+    _, _, _, client = _world()
+    urgent, signs = _prep_signs(client, "I feel unwell",
+                                [{"question": "Do you have trouble breathing?", "answer": "Yes"}])
+    assert urgent and signs == ["Trouble breathing"]
+    urgent, signs = _prep_signs(client, "I feel unwell",
+                                [{"question": "Any chest pain?", "answer": "haan"}])
+    assert urgent and signs == ["Chest pain or pressure"]
+
+
+def test_a_stiff_neck_and_a_yes_to_fever_is_urgent():
+    _, _, _, client = _world()
+    for fever_question in ("Is there a fever?", "Do you have a high fever?"):
+        urgent, signs = _prep_signs(client, "headache and a stiff neck",
+                                    [{"question": fever_question, "answer": "Yes it is"}])
+        assert urgent and signs == ["High fever with a stiff neck"]
+    urgent, _ = _prep_signs(client, "headache and a stiff neck",
+                            [{"question": "Is there a fever?", "answer": "No"}])
+    assert urgent is False
+
+
+@pytest.mark.parametrize("answer", ["No", "nahi", "not really", "Left side"])
+def test_a_no_to_a_sign_question_is_not_urgent(answer):
+    _, _, _, client = _world()
+    if answer == "Left side":  # not a yes or a no, and no sign in it: still calm
+        question = "Which side is the pain?"
+    else:
+        question = "Any chest pain?"
+    urgent, signs = _prep_signs(client, "my stomach hurts",
+                                [{"question": question, "answer": answer}])
+    assert urgent is False and signs == []
+
+
+def test_the_questions_prompt_is_v2_and_never_asks_about_emergency_signs():
+    from app.pipeline import prompts
+    assert "PREPARE_QUESTIONS v2" in Path(prompts.__file__).read_text(encoding="utf-8")
+    assert "emergency warning signs" in prompts.PREPARE_QUESTIONS
+
+
+def test_a_record_answer_with_no_kept_ids_has_no_summary():
+    rec = _RecordAnswer(item_ids=["r999"], summary="You take one medicine.")
+    _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)
+    body = _ask(client, "what do I take?").json()
+    assert body["record_items"] == [] and body["record_summary"] is None
+
+
+_LONG = "Rice has fibre. " + "It is a grain that people eat in many places. " * 8
+
+
+@pytest.mark.parametrize("text", [
+    "One. Two. Three.",  # three sentences
+    _LONG,  # over 300 characters
+    "Rice is a grain. You should eat less of it.",
+    "You must watch your sugar.",
+    "Keep taking the tablets daily.",
+    "Rice is a grain. Continue taking it with meals.",
+    "Take metformin with food.",
+    "Increase your fibre.",
+    "Switch to brown rice.",
+    "Change your medicine soon.",
+    "Avoid metformin at night.",
+    "Have you tried brown rice?",
+])
+def test_ai_summaries_must_be_short_and_free_of_advice(text):
+    _, _, _, client = _world(summary=_Summary(summary=text),
+                             plan=_plan(kind="both"),
+                             record=_RecordAnswer(item_ids=["r1"], summary=text))
+    body = _ask(client, "can I eat rice with my tablets?").json()
+    assert body["summary"] is None and body["record_summary"] is None
+    assert len(body["points"]) == 3 and len(body["record_items"]) == 1
+
+
+def test_two_short_sentences_pass():
+    ok = "Rice raises blood sugar. Brown rice has more fibre."
+    _, _, _, client = _world(summary=_Summary(summary=ok), plan=_plan(kind="both"))
+    assert _ask(client, "can I eat rice with my tablets?").json()["summary"] == ok
+
+
+def test_follow_up_questions_and_choices_get_the_wider_filter_and_length_caps():
+    follow = _FollowUps(questions=[
+        _FollowUp(text="Have you tried a warm drink?", choices=[]),
+        _FollowUp(text="Should you switch to another tablet?", choices=[]),
+        _FollowUp(text="Is it " + "very " * 50 + "bad?", choices=[]),
+        _FollowUp(text="Where is it?", choices=["Keep taking it", "Left", "x" * 41, "Right"])])
+    _, _, _, client = _world(follow=follow)
+    body = _questions(client).json()
+    assert body["questions"] == [{"id": "q1", "text": "Where is it?",
+                                  "choices": ["Left", "Right"]}]
+
+
+def test_both_with_no_general_points_uses_the_record_note():
+    from app.assist import RECORD_NOTE
+    # Unsafe search words.
+    _, _, _, client = _world(plan=_plan(words="asha rice", kind="both"))
+    assert _ask(client, "can I eat rice with my tablets?").json()["note"] == RECORD_NOTE
+    # Every point filtered out.
+    _, _, _, client = _world(plan=_plan(kind="both"),
+                             answer=_Answer(points=[_pt("Not in source.", 1, "nope nope")]))
+    assert _ask(client, "can I eat rice with my tablets?").json()["note"] == RECORD_NOTE
+
+
+def test_rejected_and_proposed_entries_stay_out_of_the_record_items():
+    from app.assist import record_items_for
+    db, _, _, _ = _world()
+    rejected = Entry(patient_id=PID, kind=EntryKind.DIAGNOSIS, label="Rejected condition")
+    rejected.set_status(EntryStatus.REJECTED, by="patient")
+    db.save_entry(rejected)
+    db.save_entry(Entry(patient_id=PID, kind=EntryKind.ALLERGY, label="Proposed allergy"))
+    entries = db.list_entries(PID)
+    labels = [i.label for i in record_items_for(entries, db.list_encounters(PID))]
+    assert "Metformin 500 mg" in labels
+    assert "Rejected condition" not in labels and "Proposed allergy" not in labels

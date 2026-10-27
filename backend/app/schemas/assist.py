@@ -21,10 +21,34 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+class PrepAnswer(BaseModel):
+    question: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+
+
 class PrepRequest(BaseModel):
     symptoms: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
                                                max_length=2000)]
     since: Annotated[str, StringConstraints(strip_whitespace=True, max_length=80)] | None = None
+    answers: list[PrepAnswer] = Field(default_factory=list, max_length=3)
+
+
+class QuestionsRequest(BaseModel):
+    symptoms: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                               max_length=2000)]
+
+
+class FollowUpQuestion(BaseModel):
+    id: str = Field(description="q1 to q3")
+    text: str
+    choices: list[str] = Field(default_factory=list, description="0 to 4 short tap answers")
+
+
+class QuestionsResponse(BaseModel):
+    urgent: bool = False
+    warning_signs: list[str] = Field(default_factory=list)
+    helpline: str | None = None
+    questions: list[FollowUpQuestion] = Field(default_factory=list)
 
 
 class AskPrevious(BaseModel):
@@ -85,6 +109,7 @@ class VisitPrep(BaseModel):
     specialty_label: str = "General physician"
     reason: str = ""
     questions: list[str] = Field(default_factory=list)
+    answers: list[PrepAnswer] = Field(default_factory=list)
     record: PrepRecord = Field(default_factory=PrepRecord)
     models_used: list[str] = Field(default_factory=list)
 
@@ -109,7 +134,20 @@ class AskPoint(BaseModel):
     url: str = ""
 
 
+class RecordItem(BaseModel):
+    """One confirmed item of the patient's own record, built by code (never from model text)."""
+
+    id: str
+    kind: Literal["medicine", "allergy", "condition", "event", "test"]
+    label: str
+    detail: str = ""
+
+
 class AskAnswer(BaseModel):
+    kind: Literal["record", "general", "both", "not_health"] = "general"
+    record_items: list[RecordItem] = Field(default_factory=list)
+    record_summary: str | None = None
+    summary: str | None = None
     urgent: bool = False
     warning_signs: list[str] = Field(default_factory=list)
     helpline: str | None = None

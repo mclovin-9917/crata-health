@@ -81,7 +81,9 @@ Use only the sources: no outside knowledge. Do not mention prices or brands to b
 """
 
 PREPARE_VISIT = """A patient typed what they feel, to get ready for a doctor visit. You also get a
-few facts from their health record. You do not diagnose, and you never tell the patient to start,
+few facts from their health record, and sometimes the patient's answers to a few follow-up
+questions (context: use them to understand the symptoms; do not repeat them as symptoms unless
+they describe one). You do not diagnose, and you never tell the patient to start,
 stop, skip or change a medicine or dose.
 
 Return:
@@ -89,6 +91,10 @@ Return:
   phrase (under 12 words). `quote`: words copied exactly, character for character, from what
   the patient typed, that back it. Items whose quote is not in their text are discarded. Use the
   patient's words only: do not add symptoms they did not mention.
+- `since`: how long the patient says it has been going on, in their own short words ("3 days",
+  "since last week"); null if they did not say. `since_quote`: words copied exactly from what the
+  patient typed (or answered) that say it; null if `since` is null. A `since` whose quote is not
+  in their words is discarded.
 - `specialty`: the one key below for the kind of doctor who would usually see this first. When
   unsure, "general_physician".
 - `reason`: one short sentence in plain English on why that kind of doctor ("Ear, nose and throat
@@ -98,24 +104,68 @@ Return:
   nothing that tells them to start, stop or skip a medicine. Fewer is fine.
 
 Keys for `specialty`:
-"""
+"""  # PREPARE_VISIT v2 (2026-10-27: since from the text, follow-up answers)
 
-ASK_SEARCH = """A patient asks a general question about food, diet or daily life and health. You do
-not answer it: you decide whether it is a health question and write words to search trusted
+PREPARE_QUESTIONS = """A patient typed what they feel, to get ready for a doctor visit. You ask up to
+3 short, plain follow-up questions whose answers would help decide which kind of doctor to see, for
+example where exactly it is, since when (only if they did not say), or whether there is a fever.
+You do not diagnose and never name a diagnosis or illness. Never ask about medicines to take and
+never tell them to start, stop, skip or change a medicine or dose. Do not repeat what they already
+said. Never ask about emergency warning signs (chest pain, trouble breathing, fainting, bleeding,
+stroke signs, self-harm): code checks those itself. Never ask "have you tried" a remedy or medicine.
+Fewer questions are fine; none is fine.
+
+Return `questions`, each:
+- `text`: one short question in plain English, addressed to the patient ("Where exactly is the
+  pain?").
+- `choices`: up to 4 very short tap answers when the answer is natural to pick ("Left side",
+  "Right side", "Both", "Not sure"); an empty list when it needs free words.
+"""  # PREPARE_QUESTIONS v2 (2026-10-27: no emergency-sign questions)
+
+ASK_SEARCH = """A patient asks a question about their health. You do not answer it: you decide what
+kind of question it is and, if general information is needed, write words to search trusted
 health sites with.
 
 Return:
-- `health_question`: true if it is about health, food and health, diet, sleep, exercise or daily
-  habits and health. false for anything else (sports scores, coding, prices, chit-chat).
-- `search_words`: at most 8 plain English words naming the food, habit or condition the question
-  is about, in general terms ("diabetes breakfast", "turmeric milk cold"). No digits. No names of
-  people. Nothing personal: not an age, a place or a medicine dose. Empty when it is not a health
-  question.
+- `kind`:
+  "record": it is about the patient's own record: their medicines, allergies, conditions, test
+    values, past visits or events ("what tablets am I taking for BP?", "what was my last sugar
+    result?").
+  "general": it asks for general health information: food, diet, sleep, exercise, habits, a
+    condition or symptom in general ("can I eat rice with diabetes?").
+  "both": it needs the patient's own record and general information together ("can I eat papaya
+    with my BP tablets?").
+  "not_health": anything else (sports scores, coding, prices, chit-chat).
+- `search_words`: for "general" and "both" only: at most 8 plain English words naming the food,
+  habit or condition the question is about, in general terms ("diabetes breakfast", "turmeric milk
+  cold"). No digits. No names of people. Nothing personal: not an age, a place or a medicine dose.
+  Empty for "record" and "not_health".
 
 You may also get the patient's previous question. If the new question leans on it ("what about
-mango?", "and at night?"), write words for the new question together with the same food, habit or
-condition from the previous one. If it stands on its own, ignore the previous question.
-"""  # ASK_SEARCH v2 (2026-10-27: previous question)
+mango?", "and at night?"), judge and write words for the new question together with the same food,
+habit or condition from the previous one. If it stands on its own, ignore the previous question.
+"""  # ASK_SEARCH v3 (2026-10-27: record / general / both / not_health)
+
+ASK_RECORD = """A patient asks a question about their own health record. You get the question and a
+numbered list of the patient's confirmed record items, each with an id.
+
+Return:
+- `item_ids`: the ids of the items that answer the question (only ids from the list; empty if
+  none do).
+- `summary`: at most 2 short plain sentences saying what those items show, using only those
+  items. Do not diagnose or advise. Never tell the reader to start, stop, skip or change a
+  medicine or dose, and give no dose or amount. If the items do not answer the question, say so
+  in one sentence.
+"""  # ASK_RECORD v1 (2026-10-27)
+
+ASK_SUMMARY = """You get a patient's question and a few short points that trusted health sites
+support. Write a summary of at most 2 short plain sentences that answers the question using only
+those points. General information, not advice for this patient: never address the reader as
+"you", never diagnose, never tell anyone to start, stop, skip or change a medicine or dose, and
+give no dose or amount.
+
+Return `summary`.
+"""  # ASK_SUMMARY v1 (2026-10-27)
 
 ASK_ANSWER = """A patient asked a general question about food or daily life and health. You get the
 question, a few facts from their record, and numbered sources from trusted health sites. Answer

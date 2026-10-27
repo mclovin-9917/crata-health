@@ -68,6 +68,7 @@ def _routes(enc_id: str, entry_id: str) -> list[tuple[str, str, dict]]:
         ("delete", f"/people/{OWNER}/trusted-by/{OTHER}", {}),
         ("post", f"/encounters/{enc_id}/entries", {"json": {"kind": "note", "label": "x"}}),
         ("post", f"/patients/{OWNER}/visit-preps", {"json": {"symptoms": "a cough"}}),
+        ("post", f"/patients/{OWNER}/visit-preps/questions", {"json": {"symptoms": "a cough"}}),
         ("get", f"/patients/{OWNER}/visit-preps", {}),
         ("get", f"/visit-preps/{PREP_ID}", {}),
         ("delete", f"/visit-preps/{PREP_ID}", {}),

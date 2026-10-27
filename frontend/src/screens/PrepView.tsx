@@ -69,7 +69,19 @@ export default function PrepViewScreen({ prepId }: { prepId: string }) {
               <ul className="list-disc space-y-0.5 pl-5">{p.symptoms.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
             ) : <None />}
           </Row>
-          <Row label="Since">{p.since ? <p>{p.since}</p> : <None />}</Row>
+          {p.since && <Row label="Since"><p>{p.since}</p></Row>}
+          {(p.answers ?? []).length > 0 && (
+            <Row label="Asked before the visit">
+              <ul className="space-y-2">
+                {(p.answers ?? []).map((a, i) => (
+                  <li key={i}>
+                    <p className="text-ink-600">{a.question}</p>
+                    <p className="font-semibold">{a.answer}</p>
+                  </li>
+                ))}
+              </ul>
+            </Row>
+          )}
 
           <Row label="Allergies">
             {r.allergies.length ? (
