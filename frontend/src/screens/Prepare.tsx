@@ -1,9 +1,10 @@
-import { ChevronRight, ClipboardList, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, ClipboardList, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useMe } from "../App";
 import { ErrorNote } from "../components";
 import { formatDate, go, useLoad } from "../lib";
+import { appendText, VoiceButton } from "../voice";
 
 /** Before a visit: say what you feel, get a summary to hand to the doctor. */
 export default function PrepareScreen() {
@@ -47,6 +48,9 @@ export default function PrepareScreen() {
             disabled={busy}
             required
           />
+          <div className="mt-2">
+            <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setText((cur) => appendText(cur, t))} />
+          </div>
         </div>
         <div>
           <label className="label" htmlFor="prep-since">Since when? (optional)</label>
@@ -87,8 +91,16 @@ export default function PrepareScreen() {
                   >
                     <span className="tile size-9"><ClipboardList size={18} aria-hidden /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold">{formatDate(p.created_at)}</span>
-                      <span className="block truncate text-sm text-ink-600">{p.text}</span>
+                      <span className="flex flex-wrap items-center gap-x-2">
+                        <span className="font-semibold">{formatDate(p.created_at)}</span>
+                        <span className="text-sm text-ink-700">{p.specialty_label}</span>
+                        {p.urgent && (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700">
+                            <AlertTriangle size={12} aria-hidden /> Urgent
+                          </span>
+                        )}
+                      </span>
+                      <span className="block truncate text-sm text-ink-600">{p.symptoms[0]?.text ?? p.text}</span>
                     </span>
                     <ChevronRight size={20} className="shrink-0 text-ink-500" aria-hidden />
                   </button>

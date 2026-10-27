@@ -401,6 +401,16 @@ export interface SignUpBody {
   blood_group?: string | null;
 }
 
+/** One test value outside its printed range (may be missing on older saves). */
+export interface OutOfRangeTest {
+  name: string;
+  value: string | number;
+  unit: string | null;
+  date: string | null;
+  direction: "high" | "low";
+  range_text: string | null;
+}
+
 /** Before a visit: a saved summary for the doctor. */
 export interface VisitPrep {
   id: string;
@@ -416,9 +426,28 @@ export interface VisitPrep {
   specialty_label: string;
   reason: string;
   questions: string[];
-  record: { allergies: string[]; medicines: string[]; conditions: string[]; events: string[]; out_of_range: string[] };
+  record: {
+    allergies: string[];
+    medicines: string[];
+    conditions: string[];
+    events: string[];
+    out_of_range: string[];
+    tests_out_of_range?: OutOfRangeTest[];
+  };
   models_used: string[];
 }
+
+export type AskCategory = "good_to_know" | "be_careful" | "your_conditions";
+export interface AskPoint {
+  text: string;
+  quote: string;
+  site: string;
+  title: string;
+  url: string;
+  category?: AskCategory;
+  source?: number;
+}
+export interface AskSource { n: number; site: string; title: string; url: string }
 
 /** Ask about my health: an answer from trusted sites (not stored on the server). */
 export interface AskAnswer {
@@ -426,11 +455,21 @@ export interface AskAnswer {
   warning_signs: string[];
   helpline?: string | null;
   health_question: boolean;
-  points: { text: string; quote: string; site: string; title: string; url: string }[];
+  points: AskPoint[];
+  sources?: AskSource[];
   allergy_notes: string[];
   considered: string[];
   note: string;
   models_used: string[];
+}
+
+/** An error from the server; `status` is the HTTP status (429 limit, 413 too big, 422 unusable). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 /** Fired when the server says the session is gone (expired, or signed out elsewhere). */
@@ -452,7 +491,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // keep the plain default message
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -551,8 +590,16 @@ export const api = {
   visitPreps: (patientId: string) => request<VisitPrep[]>(`/patients/${patientId}/visit-preps`),
   visitPrep: (id: string) => request<VisitPrep>(`/visit-preps/${id}`),
   deleteVisitPrep: (id: string) => request<void>(`/visit-preps/${id}`, { method: "DELETE" }),
-  ask: (patientId: string, question: string) =>
-    request<AskAnswer>(`/patients/${patientId}/ask`, json("POST", { question })),
+  ask: (patientId: string, question: string, previous?: { question: string; points: string[] } | null) =>
+    request<AskAnswer>(`/patients/${patientId}/ask`, json("POST", { question, previous: previous ?? null })),
+  /** Speech to text for the "Speak instead" button. The recording is not kept. */
+  voice: (patientId: string, audio: Blob) => {
+    const form = new FormData();
+    const type = audio.type || "audio/webm";
+    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+    form.append("audio", audio, `voice.${ext}`);
+    return request<{ text: string; models_used: string[] }>(`/patients/${patientId}/voice`, { method: "POST", body: form });
+  },
   medicineInfo: (name: string, generics: string[]) => {
     const q = new URLSearchParams({ name });
     generics.forEach((g) => q.append("generics", g));

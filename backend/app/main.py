@@ -13,16 +13,18 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.formparsers import MultiPartParser
 from starlette.responses import Response
 from starlette.types import Scope
 
 from app.ai.client import AIClient
 from app.ai.search import WebSearch
 from app.api.access import router as access_router
+from app.api.assist import VOICE_MAX_BYTES
 from app.api.assist import router as assist_router
 from app.api.auth import router as auth_router
 from app.api.auth import seed_demo_accounts
-from app.api.routes import router
+from app.api.routes import MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, router
 from app.config import get_settings
 from app.pipeline.run import recover_interrupted_reads
 from app.seed import seed_demo
@@ -30,6 +32,13 @@ from app.sms import SmsSender, sms_sender
 from app.storage import Storage
 
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+# Starlette keeps an uploaded file in memory only up to 1 MB and then spills it to a temporary
+# file on disk. Media must never touch the server's disk, so the limit is raised above the
+# largest upload any route accepts (plus a margin): every upload stays in memory.
+MultiPartParser.spool_max_size = (
+    max(MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, VOICE_MAX_BYTES) + 4 * 1024 * 1024
+)
 
 
 class FrontendFiles(StaticFiles):

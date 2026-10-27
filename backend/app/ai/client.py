@@ -157,6 +157,7 @@ class AIClient:
         max_tokens: int = 4096,
         extra_body: dict[str, Any] | None = None,
         usage_key: str | None = None,
+        allow_empty: bool = False,
     ) -> str:
         try:
             resp = client.chat.completions.create(
@@ -171,6 +172,8 @@ class AIClient:
         self._count(usage_key or model, getattr(resp, "usage", None))
         content = resp.choices[0].message.content
         if not content:
+            if allow_empty:
+                return ""
             raise AIError(f"Model {model} returned an empty response")
         return content
 
@@ -215,6 +218,15 @@ class AIClient:
             max_tokens=max_tokens,
             extra_body=extra,
         )
+
+    def transcribe(self, wav: bytes, instruction: str, *, max_tokens: int = 2048) -> str:
+        """Write down what one short WAV says (voice input), on Nano Omni only: no backup, thinking
+        off as for all audio. Silence may give an empty string."""
+        messages = [{"role": "user", "content": [audio_part(wav), text_part(instruction)]}]
+        return self._with_backup(
+            self.perceive_client, self.settings.perceive, None, messages, temperature=0.0,
+            max_tokens=max_tokens, allow_empty=True,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
 
     # ---- reason: text in, text or validated JSON out --------------------
     def reason(

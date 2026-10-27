@@ -1,9 +1,10 @@
-import { ChevronDown, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { api, type AskAnswer } from "../api";
+import { AlertTriangle, ExternalLink, Lightbulb, Loader2, ShieldAlert, Stethoscope } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { api, type AskAnswer, type AskCategory, type AskPoint, type AskSource } from "../api";
 import { useMe } from "../App";
 import { EmergencyNow } from "../assist";
 import { ErrorNote } from "../components";
+import { appendText, VoiceButton } from "../voice";
 
 const EXAMPLES = ["Is papaya good for me?", "What should I eat with high blood pressure?"];
 const KEEP = 5;
@@ -34,22 +35,28 @@ export default function AskScreen() {
   const me = useMe();
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; from: "main" | "follow" } | null>(null);
   const [saved, setSaved] = useState<Saved[]>(() => readSaved(me.id));
 
-  const ask = async (q: string) => {
+  const [followUp, setFollowUp] = useState("");
+
+  const ask = async (q: string, previous?: Saved) => {
     const text = q.trim();
     if (!text || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const answer = await api.ask(me.id, text);
+      const prev = previous && previous.answer.points.length > 0
+        ? { question: previous.question, points: previous.answer.points.map((p) => p.text) }
+        : null;
+      const answer = await api.ask(me.id, text, prev);
       const next = [{ question: text, answer }, ...saved].slice(0, KEEP);
       setSaved(next);
       writeSaved(me.id, next);
-      setQuestion("");
+      if (previous) setFollowUp("");
+      else setQuestion("");
     } catch (e) {
-      setError((e as Error).message);
+      setError({ text: (e as Error).message, from: previous ? "follow" : "main" });
     } finally {
       setBusy(false);
     }
@@ -77,6 +84,9 @@ export default function AskScreen() {
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}
           />
+          <div className="mt-2">
+            <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setQuestion((cur) => appendText(cur, t))} />
+          </div>
         </div>
         <div className="flex flex-wrap gap-2" aria-label="Examples">
           {EXAMPLES.map((ex) => (
@@ -95,20 +105,54 @@ export default function AskScreen() {
           {busy ? <><Loader2 size={16} className="animate-spin" aria-hidden /> Looking it up…</> : "Ask"}
         </button>
         {busy && <p className="text-sm text-ink-600" role="status">Checking trusted sites. This can take up to 30 seconds.</p>}
-        <ErrorNote error={error} />
+        <ErrorNote error={error?.from === "main" ? error.text : null} />
       </form>
 
       {saved.map((s, i) => (
         <section key={i} className="space-y-3" aria-label="Answer">
           <h2 className="section-title">{s.question}</h2>
           <Answer answer={s.answer} />
+          {i === 0 && s.answer.health_question && !s.answer.urgent && (
+            <form
+              className="card space-y-3"
+              onSubmit={(e) => { e.preventDefault(); void ask(followUp, s); }}
+            >
+              <label className="label" htmlFor="ask-follow">Ask a follow-up</label>
+              <input
+                id="ask-follow"
+                className="input"
+                maxLength={500}
+                value={followUp}
+                onChange={(e) => setFollowUp(e.target.value)}
+                disabled={busy}
+              />
+              <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setFollowUp((cur) => appendText(cur, t))} />
+              <button className="btn w-full sm:w-auto" type="submit" disabled={busy || !followUp.trim()}>
+                {busy ? <><Loader2 size={16} className="animate-spin" aria-hidden /> Looking it up…</> : "Ask"}
+              </button>
+              <ErrorNote error={error?.from === "follow" ? error.text : null} />
+            </form>
+          )}
         </section>
       ))}
     </div>
   );
 }
 
+/** Answers saved before sources were numbered have no `sources`: one entry per link the points carry. */
+function sourcesOf(a: AskAnswer): AskSource[] {
+  if (a.sources && a.sources.length > 0) return a.sources;
+  const out: AskSource[] = [];
+  for (const p of a.points) {
+    if (p.url && !out.some((s) => s.url === p.url)) {
+      out.push({ n: out.length + 1, site: p.site, title: p.title, url: p.url });
+    }
+  }
+  return out;
+}
+
 function Answer({ answer: a }: { answer: AskAnswer }) {
+  const sources = sourcesOf(a);
   if (a.urgent) return <EmergencyNow signs={a.warning_signs} helpline={a.helpline} />;
   if (!a.health_question) {
     return (
@@ -132,9 +176,42 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
       {a.points.length === 0 ? (
         <div className="card text-sm text-ink-700">{a.note}</div>
       ) : (
-        <ul className="card space-y-4">
-          {a.points.map((p, i) => <PointRow key={i} point={p} />)}
-        </ul>
+        <div className="card space-y-5">
+          {SECTIONS.map((sec) => {
+            const items = a.points.filter((p) => (p.category ?? "good_to_know") === sec.key);
+            if (items.length === 0) return null;
+            return (
+              <section key={sec.key} aria-label={sec.title}>
+                <h3 className="mb-2 flex items-center gap-1.5 text-base font-bold tracking-tight text-ink-900">
+                  {sec.icon}
+                  <span className={sec.key === "be_careful" ? "text-amber-900" : ""}>{sec.title}</span>
+                </h3>
+                <ul className="list-disc space-y-3 pl-5 marker:text-ink-400">
+                  {items.map((p, i) => <PointRow key={i} point={p} n={p.source ?? sources.find((s) => s.url === p.url)?.n} />)}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {sources.length > 0 && (
+        <section className="space-y-1.5" aria-label="Sources">
+          <h3 className="text-xs font-bold tracking-wide text-ink-600 uppercase">Sources</h3>
+          <ol className="space-y-1 text-sm text-ink-700">
+            {sources.map((src) => (
+              <li key={src.n} className="flex gap-2">
+                <span className="w-5 shrink-0 text-right text-ink-500">{src.n}.</span>
+                <span className="min-w-0">
+                  <span className="font-semibold">{src.site}</span>,{" "}
+                  <a className="inline-flex items-center gap-1 break-words text-tide-700 underline" href={src.url} target="_blank" rel="noopener noreferrer">
+                    {src.title} <ExternalLink size={12} aria-hidden />
+                  </a>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
 
       {a.considered.length > 0 && (
@@ -145,29 +222,30 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
   );
 }
 
-function PointRow({ point: p }: { point: AskAnswer["points"][number] }) {
+const SECTIONS: { key: AskCategory; title: string; icon: ReactNode }[] = [
+  { key: "good_to_know", title: "Good to know", icon: <Lightbulb size={16} className="text-ink-600" aria-hidden /> },
+  { key: "be_careful", title: "Be careful", icon: <AlertTriangle size={16} className="text-amber-700" aria-hidden /> },
+  { key: "your_conditions", title: "With your conditions", icon: <Stethoscope size={16} className="text-ink-600" aria-hidden /> },
+];
+
+function PointRow({ point: p, n }: { point: AskPoint; n?: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="space-y-1.5 text-sm text-ink-800">
-      <p>{p.text}</p>
-      <p className="flex flex-wrap items-center gap-x-3 text-xs text-ink-600">
-        <span className="font-semibold">{p.site}</span>
-        <button
-          type="button"
-          className="inline-flex min-h-8 items-center gap-1 text-tide-700 underline"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          See the source <ChevronDown size={12} className={open ? "rotate-180" : ""} aria-hidden />
-        </button>
-      </p>
+    <li className="text-sm text-ink-800">
+      {p.text}{" "}
+      <button
+        type="button"
+        className="relative -top-1 -my-1.5 inline-flex min-h-8 min-w-8 items-center justify-center rounded px-2 text-xs font-semibold text-tide-700 underline"
+        aria-expanded={open}
+        aria-label={`Show the source quote${n ? ` ${n}` : ""}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        [{n ?? "i"}]
+      </button>
       {open && (
-        <div className="space-y-1 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-700 ring-1 ring-ink-100">
-          <p>“{p.quote}”</p>
-          <a className="inline-flex items-center gap-1 break-all underline" href={p.url} target="_blank" rel="noreferrer">
-            {p.site}: {p.title} <ExternalLink size={12} aria-hidden />
-          </a>
-        </div>
+        <span className="mt-1.5 block rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-700 ring-1 ring-ink-100">
+          “{p.quote}” <span className="text-ink-500">({p.site})</span>
+        </span>
       )}
     </li>
   );

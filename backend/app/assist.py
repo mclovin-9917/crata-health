@@ -30,6 +30,9 @@ from app.pipeline.quotes import quote_in_source
 from app.schemas.assist import (
     AskAnswer,
     AskPoint,
+    AskPrevious,
+    AskSource,
+    OutOfRangeTest,
     PrepRecord,
     PrepSymptom,
     VisitPrep,
@@ -264,6 +267,7 @@ def record_for(entries: list[Entry], encounters: list[Encounter],
     events = [f"{e.label} ({e.occurred_on})" for e in timeline(confirmed)
               if e.occurred_on and e.occurred_on >= cutoff[:len(e.occurred_on)]]
     out_of_range = []
+    tests_out: list[OutOfRangeTest] = []
     for group in numbers(entries, encounters).groups:
         for s in group.series:
             p = s.latest
@@ -275,9 +279,13 @@ def record_for(entries: list[Entry], encounters: list[Encounter],
             unit = f" {p.unit}" if p.unit else ""
             out_of_range.append(f"{s.name} {_g(p.value)}{unit} on {p.on.isoformat()}: "
                                 f"{p.position} (printed range {printed})")
+            if not any(t.name == s.name and t.date == p.on.isoformat() for t in tests_out):
+                tests_out.append(OutOfRangeTest(
+                    name=s.name, value=p.value, unit=p.unit or "", date=p.on.isoformat(),
+                    direction=p.position, range_text=printed))
     return PrepRecord(allergies=_unique(allergies), medicines=_unique(medicines),
                       conditions=_unique(conditions), events=_unique(events),
-                      out_of_range=_unique(out_of_range))
+                      out_of_range=_unique(out_of_range), tests_out_of_range=tests_out)
 
 
 def _record_text(patient: Patient, record: PrepRecord, today: date) -> str:
@@ -378,6 +386,7 @@ class _AskPoint(BaseModel):
     text: str
     source: int
     quote: str
+    category: str = "good_to_know"
 
 
 class _Answer(BaseModel):
@@ -469,9 +478,23 @@ def considered_conditions(conditions: list[str], words: str) -> list[str]:
     return _unique(out)
 
 
+def _previous_text(previous: AskPrevious | None) -> str:
+    if previous is None or not previous.question.strip():
+        return ""
+    points = "\n".join(f"- {p}" for p in previous.points if p.strip())
+    out = f"Previous question (context only): {previous.question.strip()}\n"
+    if points:
+        out += f"Its points:\n{points}\n"
+    return out + "\n"
+
+
+
+_CATEGORIES = ("good_to_know", "be_careful", "your_conditions")
+
+
 def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], question: str,
         account_id: str, db: Storage, ai: AIClient, search: WebSearch,
-        now: datetime | None = None) -> AskAnswer:
+        now: datetime | None = None, previous: AskPrevious | None = None) -> AskAnswer:
     """The steps of plan section 2. May raise DailyLimit, AIError or SearchError."""
     now = now or datetime.now(UTC)
     signs = warning_signs(question)
@@ -484,8 +507,9 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
 
     used = getattr(ai, "used", [])
     used.clear()
-    plan = ai.reason_json(prompts.ASK_SEARCH, f"Question: {question}", _Plan, max_tokens=1024,
-                          thinking=False, temperature=0.0)
+    context = _previous_text(previous)
+    plan = ai.reason_json(prompts.ASK_SEARCH, f"{context}Question: {question}", _Plan,
+                          max_tokens=1024, thinking=False, temperature=0.0)
     if not plan.health_question:
         return AskAnswer(health_question=False, note=NOT_HEALTH_NOTE,
                          models_used=sorted(set(used)))
@@ -512,7 +536,7 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         ("Current medicines", record.medicines)))
     answer = ai.reason_json(
         prompts.ASK_ANSWER,
-        f"Question: {question}\n\nFrom the patient's record:\n{facts}\n\n"
+        f"{context}Question: {question}\n\nFrom the patient's record:\n{facts}\n\n"
         f"Sources:\n{_sources_block(results)}", _Answer, max_tokens=4096, thinking=False,
         temperature=0.0)
     for p in answer.points:
@@ -525,8 +549,20 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         if any(k.text.casefold() == text.casefold() for k in base.points):
             continue
         if len(base.points) < MAX_ASK_POINTS:
-            base.points.append(AskPoint(text=text, quote=p.quote, site=_site_name(r.url),
-                                        title=r.title, url=r.url))
+            n = next((s.n for s in base.sources if s.url == r.url), 0)
+            if not n:
+                n = len(base.sources) + 1
+                base.sources.append(AskSource(n=n, site=_site_name(r.url), title=r.title,
+                                              url=r.url))
+            category = p.category.strip().casefold()
+            # "With your conditions" only when the point itself names one of the patient's
+            # confirmed conditions (same names and everyday words as the search check).
+            if category not in _CATEGORIES or (
+                    category == "your_conditions"
+                    and not considered_conditions(record.conditions, f"{text} {p.quote}")):
+                category = "good_to_know"
+            base.points.append(AskPoint(category=category, source=n, text=text, quote=p.quote,
+                                        site=_site_name(r.url), title=r.title, url=r.url))
     if not base.points:
         base.note = NO_ANSWER_NOTE
     base.models_used = models()

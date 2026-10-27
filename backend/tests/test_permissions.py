@@ -72,6 +72,8 @@ def _routes(enc_id: str, entry_id: str) -> list[tuple[str, str, dict]]:
         ("get", f"/visit-preps/{PREP_ID}", {}),
         ("delete", f"/visit-preps/{PREP_ID}", {}),
         ("post", f"/patients/{OWNER}/ask", {"json": {"question": "Can I eat rice?"}}),
+        ("post", f"/patients/{OWNER}/voice",
+         {"files": {"audio": ("voice.wav", b"RIFF", "audio/wav")}}),
     ]
 
 

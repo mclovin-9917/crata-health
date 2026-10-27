@@ -32,16 +32,40 @@ class AudioChunk:
     wav: bytes
 
 
-def decode(data: bytes) -> np.ndarray:
-    """Any container/codec ffmpeg knows -> 16 kHz mono int16 samples."""
+def too_long(seconds: float | None, max_seconds: float) -> AudioError:
+    """The error for a recording over the limit (`seconds` None: stopped before the end)."""
+    if max_seconds < 120:
+        heard = f"is {seconds:.0f} s" if seconds is not None else "is too long"
+        return AudioError(f"The recording {heard}; the limit is {max_seconds:.0f} s")
+    heard = f"is {seconds / 60:.0f} min" if seconds is not None else "is too long"
+    return AudioError(f"The recording {heard}; the limit is {max_seconds / 60:.0f} min")
+
+
+def decode(data: bytes, max_seconds: float | None = None) -> np.ndarray:
+    """Any container/codec ffmpeg knows -> 16 kHz mono int16 samples.
+
+    With `max_seconds`, a recording over it is refused as soon as that is known: from the
+    container's own length when it has one, else as soon as decoding passes the limit, so a long
+    low-bitrate file is never decoded in full.
+    """
     try:
         with av.open(io.BytesIO(data)) as container:
             if not container.streams.audio:
                 raise AudioError("The file has no audio track")
+            if max_seconds is not None and container.duration:
+                known = container.duration / av.time_base
+                if known > max_seconds + 1:  # a second of slack for container rounding
+                    raise too_long(known, max_seconds)
             resampler = av.AudioResampler(format="s16", layout="mono", rate=RATE)
             parts: list[np.ndarray] = []
+            total = 0
             for frame in container.decode(container.streams.audio[0]):
-                parts += [f.to_ndarray().reshape(-1) for f in resampler.resample(frame)]
+                for f in resampler.resample(frame):
+                    arr = f.to_ndarray().reshape(-1)
+                    total += len(arr)
+                    parts.append(arr)
+                if max_seconds is not None and total > (max_seconds + 1) * RATE:
+                    raise too_long(None, max_seconds)
             parts += [f.to_ndarray().reshape(-1) for f in resampler.resample(None)]  # flush
     except av.FFmpegError as exc:
         raise AudioError(f"Could not read the audio: {exc}") from exc
@@ -80,13 +104,12 @@ def cut_points(samples: np.ndarray, target_s: float = 30.0, search_s: float = 5.
 
 
 def prepare(data: bytes, max_seconds: float = 600.0, target_s: float = 30.0) -> list[AudioChunk]:
-    samples = decode(data)
+    samples = decode(data, max_seconds)
     seconds = len(samples) / RATE
     if seconds < 0.5:
         raise AudioError("The recording is empty or too short")
     if seconds > max_seconds:
-        raise AudioError(f"The recording is {seconds / 60:.0f} min; the limit is "
-                         f"{max_seconds / 60:.0f} min")
+        raise too_long(seconds, max_seconds)
     cuts = cut_points(samples, target_s)
     return [
         AudioChunk(start_s=a / RATE, end_s=b / RATE, wav=to_wav(samples[a:b]))

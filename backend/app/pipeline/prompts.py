@@ -111,7 +111,11 @@ Return:
   is about, in general terms ("diabetes breakfast", "turmeric milk cold"). No digits. No names of
   people. Nothing personal: not an age, a place or a medicine dose. Empty when it is not a health
   question.
-"""
+
+You may also get the patient's previous question. If the new question leans on it ("what about
+mango?", "and at night?"), write words for the new question together with the same food, habit or
+condition from the previous one. If it stands on its own, ignore the previous question.
+"""  # ASK_SEARCH v2 (2026-10-27: previous question)
 
 ASK_ANSWER = """A patient asked a general question about food or daily life and health. You get the
 question, a few facts from their record, and numbered sources from trusted health sites. Answer
@@ -128,9 +132,22 @@ Return `points`, at most 5, fewer is fine, empty if the sources do not answer th
 - `source`: the number of the source it comes from.
 - `quote`: words copied exactly, character for character, from that source, that back the point.
   Points whose quote is not in the source are discarded.
+- `category`: "good_to_know" for a general fact; "be_careful" for a risk, a limit or a warning;
+  "your_conditions" for a point that matters for people with one of the conditions listed in the
+  record facts. When unsure, "good_to_know".
 
-Each point says something new. Use only the sources: no outside knowledge.
-"""
+Each point says something new. Use only the sources: no outside knowledge. You may also get the
+patient's previous question and its points, as context for a follow-up question ("what about
+mango?"): answer the new question only, and still only from the sources.
+"""  # ASK_ANSWER v2 (2026-10-27: category, previous question)
+
+VOICE_INPUT = (
+    "Write down exactly what the speaker says, in the language spoken. Hindi stays in Latin "
+    "letters (Hinglish), English stays English, mixed speech stays mixed. Do not translate, "
+    "correct, summarize or explain. No speaker labels, no notes, nothing added. If nothing was "
+    "said, answer with an empty reply."
+)  # VOICE_INPUT v1 (2026-10-27)
+
 
 GENERIC_NAMES = """For each medicine name below (one per line), say what it is.
 

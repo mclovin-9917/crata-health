@@ -1,4 +1,4 @@
-"""Before a visit, and Ask about my health: the routes (docs/assist-plan.md).
+"""Before a visit, and Ask about my health: the routes.
 
 Every route is the patient's own: anyone else gets 404, as for the rest of the record. A summary
 for the doctor is saved in the record; an answer to Ask is not.
@@ -6,18 +6,30 @@ for the doctor is saved in the record; an answer to Ask is not.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.ai.client import AIError
 from app.ai.search import SearchError
-from app.api.routes import AI, DB, Search, own_patient
+from app.api.routes import AI, DB, Search, _read_upload, own_patient
 from app.assist import DailyLimit, ask, prepare_visit, reserve_prep
 from app.auth import Me
-from app.schemas.assist import AskAnswer, AskRequest, PrepRequest, VisitPrep
+from app.media import audio as audio_prep
+from app.pipeline import prompts
+from app.schemas.assist import AskAnswer, AskRequest, PrepRequest, VisitPrep, VoiceText
 
 router = APIRouter()
 
 _TRY_AGAIN = "Could not do this right now. Try again in a minute."
+
+# Voice input (2026-10-27): short, in place of typing. Audio is never stored.
+VOICE_MAX_SECONDS = 95  # the screen stops at 85 s; the rest is slack for the upload
+VOICE_MAX_BYTES = 3 * 1024 * 1024
+VOICES_PER_DAY = 30
+VOICE_LIMIT_MESSAGE = f"You've used voice {VOICES_PER_DAY} times today. Please type instead."
+VOICE_FAILED = "Couldn't hear that. Please type it instead."
 
 
 def _prep(db: DB, me: Me, prep_id: str) -> VisitPrep:
@@ -66,8 +78,33 @@ def ask_about_health(patient_id: str, body: AskRequest, db: DB, ai: AI, search: 
     patient = own_patient(db, me, patient_id)
     try:
         return ask(patient, db.list_entries(patient_id), db.list_encounters(patient_id),
-                   body.question, me.id, db, ai, search)
+                   body.question, me.id, db, ai, search, previous=body.previous)
     except DailyLimit as exc:
         raise HTTPException(429, str(exc)) from exc
     except (AIError, SearchError) as exc:
         raise HTTPException(502, _TRY_AGAIN) from exc
+
+
+@router.post("/patients/{patient_id}/voice")
+def voice_to_text(patient_id: str, audio: Annotated[UploadFile, File(description="A short recording")],
+                  db: DB, ai: AI, me: Me) -> VoiceText:
+    own_patient(db, me, patient_id)
+    data = _read_upload(audio, "audio", VOICE_MAX_BYTES)  # in memory only, never stored
+    now = datetime.now(UTC)
+    key = f"voice:{me.id}"
+    # Counted before decoding, so a flood of bad files cannot be used to burn CPU for free.
+    if db.count_asks(key, now - timedelta(days=1)) >= VOICES_PER_DAY:
+        raise HTTPException(429, VOICE_LIMIT_MESSAGE)
+    db.record_ask(key, now)
+    try:
+        chunks = audio_prep.prepare(data, max_seconds=VOICE_MAX_SECONDS)
+    except audio_prep.AudioError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    used = getattr(ai, "used", [])
+    used.clear()
+    try:
+        parts = [ai.transcribe(c.wav, prompts.VOICE_INPUT) for c in chunks]
+    except AIError as exc:
+        raise HTTPException(502, VOICE_FAILED) from exc
+    text = " ".join(t.strip() for t in parts if t.strip())
+    return VoiceText(text=text, models_used=sorted(set(used)))

@@ -1,10 +1,13 @@
 """Before a visit and Ask about my health. Nothing here reaches a real model or a real Tavily."""
 
+import io
+import wave
 from datetime import UTC, date, datetime, timedelta
 
+import numpy as np
 import pytest
 
-from app.ai.client import AIError
+from app.ai.client import AIClient, AIError, audio_part
 from app.ai.search import SearchError, SearchResult
 from app.assist import (
     ASKS_PER_DAY,
@@ -21,7 +24,9 @@ from app.assist import (
     considered_conditions,
     warning_signs,
 )
+from app.config import Settings
 from app.main import create_app
+from app.schemas.assist import PrepRecord
 from app.schemas.patient import Patient
 from app.schemas.record import (
     Entry,
@@ -49,17 +54,19 @@ def _plan(words="diabetes rice", health=True):
     return _Plan(health_question=health, search_words=words)
 
 
-def _pt(text, source, quote):
-    return _AskPoint(text=text, source=source, quote=quote)
+def _pt(text, source, quote, category="good_to_know"):
+    return _AskPoint(text=text, source=source, quote=quote, category=category)
 
 
 ANSWER = _Answer(points=[
-    _pt("Rice is a starchy food that raises blood sugar.", 1, "Rice is a starchy food"),
-    _pt("Brown rice has more fibre than white rice.", 1, "Brown rice has more fibre"),
+    _pt("Rice is a starchy food that raises blood sugar.", 1, "Rice is a starchy food",
+        "your_conditions"),
+    _pt("Brown rice has more fibre than white rice.", 1, "Brown rice has more fibre",
+        "be_careful"),
     _pt("Rice is good for everyone.", 1, "good for everyone"),  # not in the source
     _pt("Made-up source.", 9, "anything"),  # no source 9
     _pt("Stop eating white rice.", 1, "Eat smaller portions of starchy food"),  # directive
-    _pt("Whole grains help people feel full for longer.", 2, "feel full for longer"),
+    _pt("Whole grains help people feel full for longer.", 2, "feel full for longer", "wizard"),
     _pt("Fibre helps at 500 mg.", 2, "500 mg of fibre"),  # names a dose
 ])
 
@@ -76,11 +83,20 @@ class FakeAI:
 
     def __init__(self, plan=None, answer=ANSWER, prep=PREP, fail=False):
         self.plan, self.answer, self.prep, self.fail = plan or _plan(), answer, prep, fail
-        self.calls, self.used, self.kw = [], [], []
+        self.calls, self.used, self.kw, self.users = [], [], [], []
+        self.voice, self.voice_calls = "I have a cough", []
+
+    def transcribe(self, wav, instruction, **kw):
+        self.voice_calls.append((len(wav), instruction))
+        if self.fail:
+            raise AIError("busy")
+        self.used.append("nvidia:omni")
+        return self.voice
 
     def reason_json(self, system, user, schema, **kw):
         self.calls.append(schema.__name__)
         self.kw.append(kw)
+        self.users.append(user)
         if self.fail:
             raise AIError("busy")
         self.used.append("nvidia:super")
@@ -245,7 +261,10 @@ def test_prep_is_assembled_by_code_and_saved():
     assert body["questions"] == ["Could this be an infection?", "What tests might I need?",
                                  "How long will it last?"]
     assert set(body["record"]) == {"allergies", "medicines", "conditions", "events",
-                                   "out_of_range"}
+                                   "out_of_range", "tests_out_of_range"}
+    assert body["record"]["tests_out_of_range"] == [{
+        "name": "HbA1c", "value": 8.2, "unit": "%", "date": TODAY.isoformat(),
+        "direction": "high", "range_text": "up to 5.6"}]
     assert body["record"]["allergies"] == ["Peanut allergy"]
     assert body["record"]["medicines"] == ["Metformin 500 mg"]  # the finished course is not
     assert body["record"]["conditions"] == ["Type 2 diabetes"]
@@ -376,14 +395,20 @@ def test_ask_keeps_only_points_the_source_backs():
     r = _ask(client)
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"urgent", "warning_signs", "health_question", "points", "allergy_notes",
-                         "considered", "note", "models_used", "helpline"}
+    assert set(body) == {"urgent", "warning_signs", "health_question", "points", "sources",
+                         "allergy_notes", "considered", "note", "models_used", "helpline"}
     assert [p["text"] for p in body["points"]] == [
         "Rice is a starchy food that raises blood sugar.",
         "Brown rice has more fibre than white rice.",
         "Whole grains help people feel full for longer."]
     first = body["points"][0]
-    assert set(first) == {"text", "quote", "site", "title", "url"}
+    assert set(first) == {"text", "quote", "site", "title", "url", "category", "source"}
+    assert [p["category"] for p in body["points"]] == ["your_conditions", "be_careful",
+                                                       "good_to_know"]  # unknown -> good_to_know
+    assert [p["source"] for p in body["points"]] == [1, 1, 2]
+    assert body["sources"] == [
+        {"n": 1, "site": "NHS", "title": RESULTS[0].title, "url": RESULTS[0].url},
+        {"n": 2, "site": "MedlinePlus", "title": RESULTS[1].title, "url": RESULTS[1].url}]
     assert first["site"] == "NHS" and first["url"] == RESULTS[0].url
     assert first["quote"] == "Rice is a starchy food"
     assert body["points"][2]["site"] == "MedlinePlus"
@@ -490,3 +515,233 @@ def test_ask_input_limits():
     _, _, _, client = _world()
     assert _ask(client, "").status_code == 422
     assert _ask(client, "x" * 501).status_code == 422
+
+
+# ---- Ask: categories, sources, follow-up ----------------------------------------------------
+def test_your_conditions_needs_a_confirmed_condition():
+    db, _, _, client = _world()
+    for e in db.list_entries(PID):
+        if e.kind == EntryKind.DIAGNOSIS:
+            e.set_status(EntryStatus.PROPOSED, by="system")
+            db.save_entry(e)
+    body = _ask(client).json()
+    assert [p["category"] for p in body["points"]] == ["good_to_know", "be_careful",
+                                                       "good_to_know"]
+
+
+def test_your_conditions_point_must_name_a_condition():
+    ans = _Answer(points=[
+        _pt("Whole grains help people feel full for longer.", 2, "feel full for longer",
+            "your_conditions"),  # names no condition
+        _pt("Rice is a starchy food that raises blood sugar.", 1, "Rice is a starchy food",
+            "your_conditions"),  # blood sugar: Type 2 diabetes
+    ])
+    _, _, _, client = _world(answer=ans)
+    body = _ask(client).json()
+    assert [p["category"] for p in body["points"]] == ["good_to_know", "your_conditions"]
+
+
+def test_sources_are_unique_by_url_in_first_use_order():
+    ans = _Answer(points=[_pt("Whole grains help people feel full for longer.", 2,
+                              "feel full for longer"),
+                          _pt("Brown rice has more fibre than white rice.", 1,
+                              "Brown rice has more fibre"),
+                          _pt("Rice is a starchy food that raises blood sugar.", 1,
+                              "Rice is a starchy food")])
+    _, _, _, client = _world(answer=ans)
+    body = _ask(client).json()
+    assert [(s["n"], s["url"]) for s in body["sources"]] == [(1, RESULTS[1].url),
+                                                             (2, RESULTS[0].url)]
+    assert [p["source"] for p in body["points"]] == [1, 2, 2]
+
+
+def test_a_follow_up_sends_the_previous_question_as_context_only():
+    _db, ai, _, client = _world()
+    prev = {"question": "Can I eat rice with diabetes?", "points": ["Rice raises blood sugar."]}
+    r = client.post(f"/patients/{PID}/ask", json={"question": "what about mango?",
+                                                  "previous": prev})
+    assert r.status_code == 200
+    assert "Previous question (context only): Can I eat rice with diabetes?" in ai.users[0]
+    assert "- Rice raises blood sugar." in ai.users[0]
+    assert "Question: what about mango?" in ai.users[0]
+    assert "Previous question (context only)" in ai.users[1]
+    _db, ai, _, client = _world()  # without it, no previous question in the prompts
+    _ask(client)
+    assert all("Previous question" not in u for u in ai.users)
+
+
+def test_a_follow_up_still_checks_warning_signs_and_the_limit():
+    _db, ai, search, client = _world()
+    prev = {"question": "Can I eat rice?", "points": []}
+    body = client.post(f"/patients/{PID}/ask", json={"question": "what about chest pain?",
+                                                     "previous": prev}).json()
+    assert body["urgent"] is True and ai.calls == [] and search.queries == []
+    for _i in range(ASKS_PER_DAY):
+        assert client.post(f"/patients/{PID}/ask", json={"question": "and mango?",
+                                                         "previous": prev}).status_code == 200
+    assert client.post(f"/patients/{PID}/ask", json={"question": "and mango?",
+                                                     "previous": prev}).status_code == 429
+
+
+@pytest.mark.parametrize("previous", [
+    {"question": "q" * 501, "points": []},
+    {"question": "q", "points": ["p"] * 6},
+    {"question": "q", "points": ["p" * 401]},
+])
+def test_previous_limits(previous):
+    _, _, _, client = _world()
+    r = client.post(f"/patients/{PID}/ask", json={"question": "mango?", "previous": previous})
+    assert r.status_code == 422
+    assert client.post(f"/patients/{PID}/ask", json={"question": "mango?",
+                                                     "previous": None}).status_code == 200
+
+
+def test_an_older_saved_prep_without_the_new_field_loads_with_none():
+    rec = PrepRecord.model_validate({"allergies": [], "out_of_range": ["HbA1c 8.2 % high"]})
+    assert rec.tests_out_of_range == [] and rec.out_of_range == ["HbA1c 8.2 % high"]
+
+
+# ---- voice input ----------------------------------------------------------------------------
+def _wav(seconds, rate=16_000, level=0.2):
+    t = np.arange(int(seconds * rate)) / rate
+    pcm = (np.sin(2 * np.pi * 300 * t) * level * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(pcm.tobytes())
+    return buf.getvalue()
+
+
+def _voice(client, data=None, mime="audio/wav"):
+    data = _wav(2) if data is None else data
+    return client.post(f"/patients/{PID}/voice", files={"audio": ("v.wav", data, mime)})
+
+
+def test_voice_returns_what_was_said_and_stores_nothing():
+    db, ai, _, client = _world()
+    r = _voice(client)
+    assert r.status_code == 200
+    assert r.json() == {"text": "I have a cough", "models_used": ["nvidia:omni"]}
+    assert "exactly what the speaker says" in ai.voice_calls[0][1]
+    account = client.app.state.storage.account_by_person(PID)
+    assert db.count_asks(f"voice:{account.id}", datetime.now(UTC) - timedelta(days=1)) == 1
+
+
+def test_voice_chunks_are_joined_and_silence_gives_empty_text():
+    _, ai, _, client = _world()
+    assert _voice(client, _wav(70)).json()["text"] == "I have a cough I have a cough"
+    assert len(ai.voice_calls) == 2
+    ai.voice = ""
+    assert _voice(client).json()["text"] == ""
+
+
+def test_voice_limits_422_413_415():
+    _, ai, _, client = _world()
+    too_long = _voice(client, _wav(100, rate=8000))  # 100 s, under 3 MB
+    assert too_long.status_code == 422 and "95 s" in too_long.json()["detail"]
+    assert _voice(client, b"not audio").status_code == 422
+    big = _voice(client, b"\0" * (3 * 1024 * 1024 + 1))
+    assert big.status_code == 413 and "3 MB" in big.json()["detail"]
+    assert _voice(client, _wav(1), mime="text/plain").status_code == 415
+    assert ai.voice_calls == []  # nothing reached a model
+
+
+def test_voice_upload_over_1_mb_never_reaches_the_disk(monkeypatch):
+    import tempfile
+
+    rolled = []
+    real = tempfile.SpooledTemporaryFile.rollover
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, "rollover",
+                        lambda self: (rolled.append(1), real(self))[1])
+    _, _, _, client = _world()
+    data = _wav(48)  # about 1.5 MB, over Starlette's default 1 MB spool size
+    assert len(data) > 1024 * 1024
+    r = _voice(client, data)
+    assert r.status_code == 200
+    assert rolled == []  # no temporary file was made
+
+
+def test_every_upload_limit_fits_in_the_in_memory_spool():
+    from starlette.formparsers import MultiPartParser
+
+    from app.api.assist import VOICE_MAX_BYTES
+    from app.api.routes import MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, MAX_PDF_BYTES
+
+    assert MultiPartParser.spool_max_size > max(
+        VOICE_MAX_BYTES, MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, MAX_PDF_BYTES)
+
+
+def test_a_too_long_recording_is_refused_without_a_full_decode(monkeypatch):
+    from app.media import audio as audio_mod
+
+    # Container length known: refused before any frame is decoded.
+    decoded = []
+    real = audio_mod.av.AudioResampler.resample
+    monkeypatch.setattr(audio_mod.av.AudioResampler, "resample",
+                        lambda self, f: (decoded.append(1), real(self, f))[1])
+    with pytest.raises(audio_mod.AudioError, match="95 s"):
+        audio_mod.decode(_wav(300, rate=8000), max_seconds=95)
+    assert decoded == []
+    # No usable length (forced here): decoding stops soon after passing the limit.
+    monkeypatch.setattr(audio_mod.av, "time_base", 10**12)
+    with pytest.raises(audio_mod.AudioError, match="too long"):
+        audio_mod.decode(_wav(300, rate=8000), max_seconds=95)
+    assert 0 < len(decoded) < 300 * 8000 / 1024
+
+
+def test_voice_is_counted_before_decoding():
+    _, _, _, client = _world()
+    for _i in range(30):
+        assert _voice(client, b"not audio").status_code == 422  # bad files count too
+    r = _voice(client)
+    assert r.status_code == 429
+
+
+def test_voice_limit_is_30_a_day_per_account():
+    _, _, _, client = _world()
+    for _i in range(30):
+        assert _voice(client).status_code == 200
+    r = _voice(client)
+    assert r.status_code == 429
+    assert r.json()["detail"] == "You've used voice 30 times today. Please type instead."
+    assert _ask(client).status_code == 200  # asks are counted separately
+
+
+def test_voice_502_when_the_model_fails():
+    _, _, _, client = _world(fail=True)
+    r = _voice(client)
+    assert r.status_code == 502
+    assert r.json()["detail"] == "Couldn't hear that. Please type it instead."
+
+
+# ---- AIClient.transcribe: Nano Omni only ----------------------------------------------------
+class _Chat:
+    def __init__(self, replies):
+        self.replies, self.calls = list(replies), []
+        self.chat = self.completions = self
+
+    def create(self, **kw):
+        self.calls.append(kw)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        msg = type("M", (), {"content": reply})()
+        return type("R", (), {"choices": [type("C", (), {"message": msg})()]})()
+
+
+def test_transcribe_uses_omni_with_thinking_off_and_no_backup():
+    keys = {"nvidia_api_key": "nv", "nebius_api_key": "nb"}
+    primary, backup = _Chat([RuntimeError("hung")]), _Chat(["never"])
+    ai = AIClient(Settings(_env_file=None, **keys), client=primary, backup_client=backup)
+    with pytest.raises(AIError):
+        ai.transcribe(b"wav", "write it")
+    assert backup.calls == []
+    primary.replies = ["hello", ""]
+    assert ai.transcribe(b"wav", "write it") == "hello"
+    call = primary.calls[-1]
+    assert call["temperature"] == 0.0
+    assert call["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
+    assert call["messages"][0]["content"][0] == audio_part(b"wav")
+    assert ai.transcribe(b"wav", "write it") == ""  # silence is allowed

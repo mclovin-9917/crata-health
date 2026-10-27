@@ -188,6 +188,9 @@ Sign in as Asha. Each "Ask" that is not answered from the cache uses one Tavily 
 - [ ] 8c.5 Ask "Is salt bad for high blood pressure?": a few points, each with the site's name (NHS, Mayo Clinic, MedlinePlus, WHO, CDC) and "See the source" opening the exact words and the link; "Searched with your condition: Hypertension"; the grey note "General information ... not advice for you". Ask it again: the same answer, faster (no new search).
 - [ ] 8c.6 Ask "Can I eat banana with chest pain and breathlessness?": only the red emergency card, no answer. Ask "Who won the cricket match?": a polite note that it answers health questions only.
 - [ ] 8c.7 Sign out and sign in as Ravi: Ask shows none of Asha's questions.
+- [ ] 8c.8 Speak instead (on Before a visit and on Ask): allow the microphone, say a sentence, Stop. Within a few seconds the words appear in the box and can be edited; nothing is sent until you press the main button. Leave the screen while recording: the browser's mic indicator turns off.
+- [ ] 8c.9 Under an answer, "Ask a follow-up": "What about pickles?" after the salt question answers about pickles and blood pressure. Points sit under "Good to know", "Be careful" or "With your conditions"; each [n] opens the exact words, and "Sources" lists the sites by number.
+- [ ] 8c.10 The summary for the doctor reads as rows: symptoms, since, allergies (red chips), medicines and conditions (chips), recent events, tests out of range (name, value, High or Low, printed range, date), questions; "In my words" is folded but prints.
 
 ## 9. Emergency card and doctors
 
