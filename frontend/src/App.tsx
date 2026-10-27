@@ -5,6 +5,9 @@ import { go, takeReturn, useRoute } from "./lib";
 import { isSettled, visitMedia } from "./media";
 import AccessScreen from "./screens/Access";
 import AddScreen from "./screens/Add";
+import AskScreen from "./screens/Ask";
+import PrepareScreen from "./screens/Prepare";
+import PrepViewScreen from "./screens/PrepView";
 import PeopleScreen from "./screens/People";
 import DoctorScreen from "./screens/Doctor";
 import EmergencyScreen from "./screens/Emergency";
@@ -58,6 +61,13 @@ export default function App() {
 
   const signOut = () => {
     api.auth.logout().finally(() => {
+      try {
+        for (const k of Object.keys(sessionStorage)) {
+          if (k.startsWith("crata.askAnswers.")) sessionStorage.removeItem(k);
+        }
+      } catch {
+        // storage blocked: nothing to clear
+      }
       setMe(null);
       go("/");
     });
@@ -176,6 +186,10 @@ function Screen({ route, admin }: { route: string[]; admin: boolean }) {
       return <TrustedScreen />;
     case "people":
       return <PeopleScreen />;
+    case "prepare":
+      return route[1] ? <PrepViewScreen prepId={route[1]} /> : <PrepareScreen />;
+    case "ask":
+      return <AskScreen />;
     case "meta":
       return admin ? <MetaScreen /> : <AdminOnly />;
     default:

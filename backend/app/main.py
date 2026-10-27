@@ -19,6 +19,7 @@ from starlette.types import Scope
 from app.ai.client import AIClient
 from app.ai.search import WebSearch
 from app.api.access import router as access_router
+from app.api.assist import router as assist_router
 from app.api.auth import router as auth_router
 from app.api.auth import seed_demo_accounts
 from app.api.routes import router
@@ -67,6 +68,7 @@ def create_app(
     app.include_router(router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(access_router, prefix="/api")
+    app.include_router(assist_router, prefix="/api")
     if FRONTEND_DIST.is_dir():
         app.mount("/", FrontendFiles(directory=FRONTEND_DIST, html=True), name="frontend")
     return app

@@ -1,6 +1,7 @@
 """Web search through Tavily. The rest of the app talks to this class, never to Tavily directly.
 
-Only search words leave the app (a medicine's name), never anything about a patient.
+Only search words leave the app (a medicine's name; for Ask, a few general words checked by
+`assist.check_search_words`), never the patient's record.
 API checked against docs.tavily.com (POST /search, Bearer key, include_domains) on 2026-10-12.
 """
 

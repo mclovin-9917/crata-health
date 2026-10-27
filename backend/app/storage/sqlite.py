@@ -14,8 +14,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
+from app.ai.search import SearchResult
 from app.schemas.access import (
     AccessLogEntry,
     Alert,
@@ -25,11 +26,13 @@ from app.schemas.access import (
     append_log,
 )
 from app.schemas.account import Account, CodeChallenge, Session
+from app.schemas.assist import VisitPrep
 from app.schemas.medicine import BrandMatch, MedicineInfo
 from app.schemas.patient import Patient
 from app.schemas.record import Encounter, EncounterStatus, Entry, EntryStatus
 
 T = TypeVar("T", bound=BaseModel)
+_RESULTS = TypeAdapter(list[SearchResult])
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS patients (
@@ -63,6 +66,14 @@ CREATE TABLE IF NOT EXISTS trusted_invites (
     id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, phone TEXT NOT NULL, data TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS ix_invites_patient ON trusted_invites (patient_id);
 CREATE INDEX IF NOT EXISTS ix_invites_phone ON trusted_invites (phone);
+CREATE TABLE IF NOT EXISTS visit_preps (
+    id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, data TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS ix_visit_preps_patient ON visit_preps (patient_id);
+CREATE TABLE IF NOT EXISTS ask_log (  -- one row per question asked, for the daily limit
+    seq INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT NOT NULL, at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS ix_ask_account ON ask_log (account_id, at);
+CREATE TABLE IF NOT EXISTS search_cache (  -- id: the normalised query and its sites
+    id TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS ix_encounters_patient ON encounters (patient_id, created_at);
 CREATE INDEX IF NOT EXISTS ix_entries_patient ON entries (patient_id, status);
 CREATE INDEX IF NOT EXISTS ix_entries_encounter ON entries (encounter_id);
@@ -178,6 +189,48 @@ class Storage:
 
     def get_brand_match(self, key: str) -> BrandMatch | None:
         return self._one(BrandMatch, "SELECT data FROM brand_matches WHERE id = ?", key)
+
+    # ---- before a visit, and Ask about my health --------------------------
+    def save_visit_prep(self, prep: VisitPrep) -> None:
+        with self._tx() as db:
+            _upsert(db, "visit_preps", id=prep.id, patient_id=prep.patient_id,
+                    data=prep.model_dump_json())
+
+    def get_visit_prep(self, prep_id: str) -> VisitPrep | None:
+        return self._one(VisitPrep, "SELECT data FROM visit_preps WHERE id = ?", prep_id)
+
+    def list_visit_preps(self, patient_id: str) -> list[VisitPrep]:
+        """Newest first."""
+        preps = self._many(VisitPrep, "SELECT data FROM visit_preps WHERE patient_id = ?",
+                           patient_id)
+        return sorted(preps, key=lambda p: p.created_at, reverse=True)
+
+    def delete_visit_prep(self, prep_id: str) -> None:
+        with self._tx() as db:
+            db.execute("DELETE FROM visit_preps WHERE id = ?", (prep_id,))
+
+    def record_ask(self, account_id: str, at: datetime) -> None:
+        with self._tx() as db:
+            db.execute("INSERT INTO ask_log (account_id, at) VALUES (?, ?)",
+                       (account_id, at.isoformat()))
+
+    def count_asks(self, account_id: str, since: datetime) -> int:
+        with self._tx() as db:
+            row = db.execute("SELECT COUNT(*) FROM ask_log WHERE account_id = ? AND at >= ?",
+                             (account_id, since.isoformat())).fetchone()
+        return int(row[0])
+
+    def get_search_cache(self, key: str, newer_than: datetime) -> list[SearchResult] | None:
+        """The saved results of one search, if fetched after `newer_than`."""
+        with self._tx() as db:
+            row = db.execute("SELECT data FROM search_cache WHERE id = ? AND fetched_at >= ?",
+                             (key, newer_than.isoformat())).fetchone()
+        return _RESULTS.validate_json(row[0]) if row else None
+
+    def save_search_cache(self, key: str, results: list[SearchResult], at: datetime) -> None:
+        with self._tx() as db:
+            _upsert(db, "search_cache", id=key, data=_RESULTS.dump_json(results).decode(),
+                    fetched_at=at.isoformat())
 
     # ---- entries ----------------------------------------------------------
     def save_entry(self, e: Entry) -> None:
@@ -383,7 +436,7 @@ class Storage:
         marks = ", ".join("?" * len(person_ids))
         with self._tx() as db:
             for table in ("entries", "encounters", "access_log", "emergency_codes",
-                          "trusted_invites"):
+                          "trusted_invites", "visit_preps"):
                 db.execute(f"DELETE FROM {table} WHERE patient_id IN ({marks})", person_ids)
             db.execute(f"DELETE FROM alerts WHERE recipient_id IN ({marks}) "
                        f"OR json_extract(data, '$.patient_id') IN ({marks})", person_ids * 2)

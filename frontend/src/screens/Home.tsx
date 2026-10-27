@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BellRing, ChevronRight, ClipboardCheck, Cpu, FileText, FolderHeart, HeartHandshake, Mic, Plus, ShieldCheck, Siren,
+  AlertTriangle, BellRing, ChevronRight, ClipboardCheck, ClipboardList, Cpu, FileText, FolderHeart, HeartHandshake, MessageCircleQuestion, Mic, Plus, ShieldCheck, Siren,
   TrendingUp, Users, Wrench,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -115,6 +115,23 @@ export default function HomeScreen() {
           title="Emergency card"
           sub="For a doctor, with a QR code"
           danger
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <BigAction
+          onClick={() => go("/prepare")}
+          icon={<ClipboardList size={24} aria-hidden />}
+          tile=""
+          title="Before a visit"
+          sub="Tell us what you feel. Get a summary for your doctor."
+        />
+        <BigAction
+          onClick={() => go("/ask")}
+          icon={<MessageCircleQuestion size={24} aria-hidden />}
+          tile=""
+          title="Ask about my health"
+          sub="Food, diet and daily life, from trusted health sites."
         />
       </div>
 

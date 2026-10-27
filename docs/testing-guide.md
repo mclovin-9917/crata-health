@@ -177,6 +177,18 @@ Sign in as Asha first (she has readings and two lab reports already), then as Me
 - [ ] 8b.9 A reading of something no report has (say weight) gets no marker at all.
 - [ ] 8b.10 The emergency card shows none of these numbers. My record > Visits does not list the readings under "Added by you" (they live here); My record > Summary has an "Open My health numbers" link that links here.
 
+## 8c. Before a visit and Ask about my health
+
+Sign in as Asha. Each "Ask" that is not answered from the cache uses one Tavily search; keep this section to a few questions.
+
+- [ ] 8c.1 Home has two tiles, "Before a visit" and "Ask about my health".
+- [ ] 8c.2 Before a visit: type "Itchy red rash on both arms, worse at night. Mild fever yesterday.", since "4 days", "Make my summary". Within about 30 s: "Who to see" marked Suggested (a skin specialist or a general physician) with one line why and "A suggestion, not a diagnosis"; the summary lists both symptoms, your words in full, 4 days, the sulfa allergy in red, her medicines, conditions and test values outside their printed range, and up to 3 questions. Nothing tells you to start or stop a medicine.
+- [ ] 8c.3 Print: only the summary card prints (no header, no buttons). Back on Before a visit, the summary is listed; Delete asks first, then removes it.
+- [ ] 8c.4 Type "Sudden chest pain and I can't breathe properly": the red "Get emergency care now" card comes first with both warning signs and "Call 112 or go to the nearest emergency department". "No chest pain, just a cough" does not show it.
+- [ ] 8c.5 Ask "Is salt bad for high blood pressure?": a few points, each with the site's name (NHS, Mayo Clinic, MedlinePlus, WHO, CDC) and "See the source" opening the exact words and the link; "Searched with your condition: Hypertension"; the grey note "General information ... not advice for you". Ask it again: the same answer, faster (no new search).
+- [ ] 8c.6 Ask "Can I eat banana with chest pain and breathlessness?": only the red emergency card, no answer. Ask "Who won the cricket match?": a polite note that it answers health questions only.
+- [ ] 8c.7 Sign out and sign in as Ravi: Ask shows none of Asha's questions.
+
 ## 9. Emergency card and doctors
 
 - [ ] 9.1 As Meera, open Emergency card: the card (allergies, current medicines, conditions), then the QR code with one sentence about it, then the timeline. The card link and a note about the address are behind "More info".

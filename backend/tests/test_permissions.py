@@ -10,12 +10,14 @@ import pytest
 from app.main import create_app
 from app.schemas.access import TrustedLink
 from app.schemas.account import Account, AccountRole
+from app.schemas.assist import VisitPrep
 from app.schemas.patient import Patient
 from app.schemas.record import Encounter, EncounterStatus, Entry, EntryKind
 from app.storage import Storage
 from tests.conftest import api_client
 
 OWNER, TRUSTED, OTHER = "p-owner", "p-trusted", "p-other"
+PREP_ID = "prep-owner"
 
 
 @pytest.fixture(scope="module")
@@ -27,6 +29,7 @@ def world():
     entry = Entry(kind=EntryKind.NOTE, label="A note")
     enc = Encounter(patient_id=OWNER, status=EncounterStatus.READY, entries=[entry])
     db.save_encounter(enc)
+    db.save_visit_prep(VisitPrep(id=PREP_ID, patient_id=OWNER, text="a cough"))
     return create_app(db), enc.id, entry.id
 
 
@@ -64,6 +67,11 @@ def _routes(enc_id: str, entry_id: str) -> list[tuple[str, str, dict]]:
         ("get", f"/people/{OWNER}/trusted-by", {}),
         ("delete", f"/people/{OWNER}/trusted-by/{OTHER}", {}),
         ("post", f"/encounters/{enc_id}/entries", {"json": {"kind": "note", "label": "x"}}),
+        ("post", f"/patients/{OWNER}/visit-preps", {"json": {"symptoms": "a cough"}}),
+        ("get", f"/patients/{OWNER}/visit-preps", {}),
+        ("get", f"/visit-preps/{PREP_ID}", {}),
+        ("delete", f"/visit-preps/{PREP_ID}", {}),
+        ("post", f"/patients/{OWNER}/ask", {"json": {"question": "Can I eat rice?"}}),
     ]
 
 

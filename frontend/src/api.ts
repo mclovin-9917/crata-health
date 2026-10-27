@@ -401,6 +401,38 @@ export interface SignUpBody {
   blood_group?: string | null;
 }
 
+/** Before a visit: a saved summary for the doctor. */
+export interface VisitPrep {
+  id: string;
+  patient_id: string;
+  created_at: string;
+  text: string;
+  since: string | null;
+  urgent: boolean;
+  warning_signs: string[];
+  helpline?: string | null;
+  symptoms: { text: string; quote: string }[];
+  specialty: string;
+  specialty_label: string;
+  reason: string;
+  questions: string[];
+  record: { allergies: string[]; medicines: string[]; conditions: string[]; events: string[]; out_of_range: string[] };
+  models_used: string[];
+}
+
+/** Ask about my health: an answer from trusted sites (not stored on the server). */
+export interface AskAnswer {
+  urgent: boolean;
+  warning_signs: string[];
+  helpline?: string | null;
+  health_question: boolean;
+  points: { text: string; quote: string; site: string; title: string; url: string }[];
+  allergy_notes: string[];
+  considered: string[];
+  note: string;
+  models_used: string[];
+}
+
 /** Fired when the server says the session is gone (expired, or signed out elsewhere). */
 export const SIGNED_OUT = "crata:signed-out";
 
@@ -514,6 +546,13 @@ export const api = {
   stepDown: (personId: string, patientId: string) =>
     request<TrustedPerson[]>(`/people/${personId}/trusted-by/${patientId}`, { method: "DELETE" }),
   meta: () => request<Meta>("/meta"),
+  createVisitPrep: (patientId: string, symptoms: string, since: string | null) =>
+    request<VisitPrep>(`/patients/${patientId}/visit-preps`, json("POST", { symptoms, since: since || null })),
+  visitPreps: (patientId: string) => request<VisitPrep[]>(`/patients/${patientId}/visit-preps`),
+  visitPrep: (id: string) => request<VisitPrep>(`/visit-preps/${id}`),
+  deleteVisitPrep: (id: string) => request<void>(`/visit-preps/${id}`, { method: "DELETE" }),
+  ask: (patientId: string, question: string) =>
+    request<AskAnswer>(`/patients/${patientId}/ask`, json("POST", { question })),
   medicineInfo: (name: string, generics: string[]) => {
     const q = new URLSearchParams({ name });
     generics.forEach((g) => q.append("generics", g));

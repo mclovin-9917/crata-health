@@ -80,6 +80,58 @@ Each point says something new: when several sources say the same thing, use it o
 Use only the sources: no outside knowledge. Do not mention prices or brands to buy.
 """
 
+PREPARE_VISIT = """A patient typed what they feel, to get ready for a doctor visit. You also get a
+few facts from their health record. You do not diagnose, and you never tell the patient to start,
+stop, skip or change a medicine or dose.
+
+Return:
+- `symptoms`: what the patient describes, one item per symptom. `text`: a short plain-English
+  phrase (under 12 words). `quote`: words copied exactly, character for character, from what
+  the patient typed, that back it. Items whose quote is not in their text are discarded. Use the
+  patient's words only: do not add symptoms they did not mention.
+- `specialty`: the one key below for the kind of doctor who would usually see this first. When
+  unsure, "general_physician".
+- `reason`: one short sentence in plain English on why that kind of doctor ("Ear, nose and throat
+  doctors see problems like a blocked ear."). Never a diagnosis, never about a medicine.
+- `questions`: up to 3 short questions the patient may want to ask the doctor, in the first
+  person, about what they described ("How long should I expect this to last?"). No doses, and
+  nothing that tells them to start, stop or skip a medicine. Fewer is fine.
+
+Keys for `specialty`:
+"""
+
+ASK_SEARCH = """A patient asks a general question about food, diet or daily life and health. You do
+not answer it: you decide whether it is a health question and write words to search trusted
+health sites with.
+
+Return:
+- `health_question`: true if it is about health, food and health, diet, sleep, exercise or daily
+  habits and health. false for anything else (sports scores, coding, prices, chit-chat).
+- `search_words`: at most 8 plain English words naming the food, habit or condition the question
+  is about, in general terms ("diabetes breakfast", "turmeric milk cold"). No digits. No names of
+  people. Nothing personal: not an age, a place or a medicine dose. Empty when it is not a health
+  question.
+"""
+
+ASK_ANSWER = """A patient asked a general question about food or daily life and health. You get the
+question, a few facts from their record, and numbered sources from trusted health sites. Answer
+with short points that the sources back, using only the sources. This is general information, not
+advice for this patient, and you do not diagnose.
+
+Return `points`, at most 5, fewer is fine, empty if the sources do not answer the question. Each:
+- `text`: one short sentence (under 25 words) in plain English, in your own words, stated as a
+  fact about the food or habit or about people in general, never addressed to "you". Where the
+  record facts make a source point matter (a condition, an allergy), say so about people with
+  that condition in general, not about this patient. Never tell the reader to start, stop, skip
+  or change a medicine or a dose, even when a source does, and never give a dose or an amount of
+  a medicine. For anything serious write "The sources say to get medical help if ...".
+- `source`: the number of the source it comes from.
+- `quote`: words copied exactly, character for character, from that source, that back the point.
+  Points whose quote is not in the source are discarded.
+
+Each point says something new. Use only the sources: no outside knowledge.
+"""
+
 GENERIC_NAMES = """For each medicine name below (one per line), say what it is.
 
 - `name`: the line exactly as given.

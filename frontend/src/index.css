@@ -208,6 +208,21 @@ body::before {
   }
 }
 
+/* Printing a summary for the doctor: only the summary card, nothing around it. */
+@media print {
+  body::before, header { display: none !important; }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn, .btn-light, .input { transition: none; }
 }
