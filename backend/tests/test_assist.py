@@ -1029,6 +1029,19 @@ def test_the_questions_prompt_is_v2_and_never_asks_about_emergency_signs():
     assert "emergency warning signs" in prompts.PREPARE_QUESTIONS
 
 
+def test_a_record_summary_may_read_back_the_record_dose():
+    rec = _RecordAnswer(item_ids=["r1"], summary="You are taking Metformin 500 mg once daily.")
+    _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)
+    body = _ask(client, "what do I take?").json()
+    assert body["record_summary"] == "You are taking Metformin 500 mg once daily."
+
+
+def test_a_record_summary_with_a_number_not_in_the_record_is_dropped():
+    rec = _RecordAnswer(item_ids=["r1"], summary="You are taking Metformin 1000 mg once daily.")
+    _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)
+    assert _ask(client, "what do I take?").json()["record_summary"] is None
+
+
 def test_a_record_answer_with_no_kept_ids_has_no_summary():
     rec = _RecordAnswer(item_ids=["r999"], summary="You take one medicine.")
     _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)

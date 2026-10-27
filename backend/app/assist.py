@@ -736,7 +736,29 @@ def _record_part(question: str, items: list[RecordItem], ai: AIClient,
         return [], None
     summary = " ".join(got.summary.split())
     names = [i.label for i in items if i.kind == "medicine"]
-    return kept, (summary if summary and _summary_ok(summary, names) else None)
+    return kept, (summary if summary and _record_summary_ok(summary, kept, names) else None)
+
+
+_IMPERATIVE = re.compile(r"\W*(please\s+)?(take|use|apply|eat|drink|try|avoid|stop|start|continue|keep|"
+                         r"increase|reduce|lower|raise|switch|change|skip|double|halve)\b", re.IGNORECASE)
+
+
+def _record_summary_ok(summary: str, kept: list[RecordItem], medicines: list[str]) -> bool:
+    """Reading back the record ("Amlodipine 5 mg once a day") is not advice, so the dose check is
+    replaced by this: every number in the summary must be in the kept items. Everything else is
+    as for any AI summary (length, sentences, no orders, no instructions about medicines)."""
+    record_text = " ".join(f"{i.label} {i.detail}" for i in kept)
+    record_numbers = set(re.findall(r"\d+(?:\.\d+)?", record_text))
+    if any(n not in record_numbers for n in re.findall(r"\d+(?:\.\d+)?", summary)):
+        return False
+    sentences = [x for x in re.split(r"(?<=[.!?])\s+", summary.strip()) if x.strip(" .!?")]
+    if any(_IMPERATIVE.match(s) for s in sentences):  # "Take 500 mg daily." is an order
+        return False
+    return (len(summary) <= MAX_SUMMARY_CHARS and len(sentences) <= MAX_SUMMARY_SENTENCES
+            and not _YOU_ORDERS.search(summary) and not DIRECTIVE.search(summary)
+            and not INSTRUCTION.search(summary) and not _MEDICINE_ADVICE.search(summary)
+            and not any(re.search(rf"\bavoid\b\W+(\w+\W+){{0,3}}?{re.escape(n)}", summary, re.IGNORECASE)
+                        for n in _medicine_names(medicines)))
 
 
 def _summary_of_points(question: str, points: list[AskPoint], ai: AIClient,
