@@ -222,7 +222,9 @@ const SAMPLES: [file: string, what: string][] = [
   ["asha-bill.png", "Sample pharmacy bill (goes with the prescription above)"],
   ["meera-visit2-prescription.png", "Sample prescription 2"],
   ["meera-visit2-bill.png", "Sample pharmacy bill 2 (goes with prescription 2)"],
-  ["meera-visit4-lab-report.png", "Sample lab report with test results"],
+  ["meera-visit4-prescription-tests.png", "Sample prescription that orders tests"],
+  ["meera-visit4-lab-report.png", "Sample lab report (add it after the prescription above, as its own visit)"],
+  ["ct-chest-report.pdf", "Sample CT scan report (2 pages)"],
 ];
 
 /** For someone with no documents to hand: made-up files to download, then add with "Choose files". */

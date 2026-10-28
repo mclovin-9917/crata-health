@@ -131,7 +131,7 @@ export default function HomeScreen() {
           icon={<MessageCircleQuestion size={24} aria-hidden />}
           tile=""
           title="Ask about my health"
-          sub="Food, diet and daily life, from trusted health sites."
+          sub="Your record, food and daily life. Answers show where they came from."
         />
       </div>
 
