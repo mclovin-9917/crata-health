@@ -982,11 +982,31 @@ def _summary_of_points(question: str, points: list[AskPoint], ai: AIClient,
     return text if text and _summary_ok(text, medicines) else None
 
 
+# Messages that only ask for the last question again (whole message, any case, punctuation and
+# "please" ignored). Decided in code, not by the model: a model sometimes reads "check again" as a
+# new question. Includes common Hinglish.
+RE_ASK_PHRASES = frozenset({
+    "check again", "try again", "again", "repeat", "ask again", "one more time", "same question",
+    "refresh", "redo", "phir se", "dobara", "fir se check karo", "phir se check karo",
+})
+
+
+def is_re_ask(text: str) -> bool:
+    words = re.findall(r"[\w']+", text.casefold())
+    if words and words[0] == "please":
+        words = words[1:]
+    elif words and words[-1] == "please":
+        words = words[:-1]
+    return " ".join(words) in RE_ASK_PHRASES
+
+
 def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], question: str,
         account_id: str, db: Storage, ai: AIClient, search: WebSearch,
         now: datetime | None = None, previous: AskPrevious | None = None) -> AskAnswer:
     """The steps of plan section 2. May raise DailyLimit, AIError or SearchError."""
     now = now or datetime.now(UTC)
+    if previous is not None and previous.question.strip() and is_re_ask(question):
+        question, previous = previous.question.strip(), None  # repeat the last question as it was
 
     def urgent(signs: list[str]) -> AskAnswer:
         return AskAnswer(urgent=True, warning_signs=signs, note=URGENT_NOTE,

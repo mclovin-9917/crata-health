@@ -1405,7 +1405,7 @@ def test_a_follow_up_may_search_with_a_condition_typed_in_the_question_it_follow
     assert search.queries == []  # nothing typed named it
 
 
-def _follow(client, question="check again", previous=None):
+def _follow(client, question="check it once more", previous=None):  # not a re-ask phrase
     previous = previous or {"question": "How have my sugar levels been?", "points": []}
     return client.post(f"/patients/{PID}/ask", json={"question": question, "previous": previous})
 
@@ -1418,9 +1418,9 @@ def test_check_again_after_a_record_answer_is_a_record_question_with_the_previou
     assert len(body["record_items"]) == 1 and search.queries == []
     assert ai.calls == ["_Plan", "_RecordAnswer"]
     assert "Previous question (context only): How have my sugar levels been?" in ai.users[0]
-    assert "Question: check again" in ai.users[0]
+    assert "Question: check it once more" in ai.users[0]
     assert "Question: How have my sugar levels been?" in ai.users[1]  # the record part
-    assert "check again" not in ai.users[1].split("Question:")[1]
+    assert "check it once" not in ai.users[1].split("Question:")[1]
     assert "full_question" not in body
 
 
@@ -1428,7 +1428,7 @@ def test_the_full_question_also_goes_to_the_web_answer_and_the_allergy_note():
     plan = _Plan(kind="general", search_words="rice breakfast",
                  full_question="Can I eat peanut butter with rice?")
     _, ai, search, client = _world(plan=plan)
-    body = _follow(client, "try again").json()
+    body = _follow(client, "try that once more").json()
     assert len(search.queries) == 1
     assert "Question: Can I eat peanut butter with rice?" in ai.users[1]
     assert body["allergy_notes"] == ["Your record lists an allergy to Peanut."]
@@ -1442,7 +1442,7 @@ def test_an_allergen_typed_by_the_patient_is_noted_even_if_the_model_rewords_the
     assert body["allergy_notes"] == ["Your record lists an allergy to Peanut."]
     plan = _Plan(kind="record", full_question="Do I have a peanut allergy?")  # only the model's
     _, _, _, client = _world(plan=plan)
-    assert _follow(client, "check again").json()["allergy_notes"] == [
+    assert _follow(client, "check it once more").json()["allergy_notes"] == [
         "Your record lists an allergy to Peanut."]
 
 
@@ -1469,6 +1469,30 @@ def test_the_models_full_question_is_checked_for_warning_signs_too():
     assert ai.calls == ["_Plan"]
 
 
+@pytest.mark.parametrize("typed", ["check again", "Check again!", "please try again",
+                                   "Repeat, please.", "  DOBARA ", "phir se check karo"])
+def test_a_re_ask_phrase_repeats_the_previous_question_in_code(typed):
+    _, ai, _, client = _world(plan=_plan(words="", kind="record"))  # the model plan is not used
+    body = _follow(client, typed).json()
+    assert ai.calls[0] == "_Plan"
+    assert ai.users[0] == "Question: How have my sugar levels been?"  # no context: it is repeated
+    assert "check again" not in ai.users[0].lower() and body["kind"] == "record"
+
+
+@pytest.mark.parametrize("typed", ["check again my cholesterol", "again and again", "what about it"])
+def test_more_than_a_re_ask_phrase_goes_the_normal_way(typed):
+    _, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    _follow(client, typed)
+    assert ai.users[0].endswith(f"Question: {typed}")
+    assert "Previous question (context only): How have my sugar levels been?" in ai.users[0]
+
+
+def test_a_re_ask_phrase_without_a_previous_question_is_unchanged():
+    _, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    client.post(f"/patients/{PID}/ask", json={"question": "check again"})
+    assert ai.users[0] == "Question: check again"
+
+
 def test_a_full_question_is_ignored_without_a_previous_question():
     plan = _Plan(kind="record", full_question="How have my sugar levels been?")
     _, ai, _, client = _world(plan=plan)
@@ -1477,7 +1501,7 @@ def test_a_full_question_is_ignored_without_a_previous_question():
     assert "sugar levels" not in ai.users[1].split("The patient's confirmed record")[0]
     _, ai, _, client = _world(plan=plan)  # an empty previous question counts as none
     _follow(client, previous={"question": "  ", "points": []})
-    assert "Question: check again" in ai.users[1]
+    assert "Question: check it once more" in ai.users[1]
 
 
 def test_a_full_question_is_one_line_and_at_most_200_characters():
@@ -1490,7 +1514,7 @@ def test_a_full_question_is_one_line_and_at_most_200_characters():
     assert "\n" not in asked and len(asked) <= 200
     _, ai, _, client = _world(plan=_Plan(kind="record", full_question="   "))
     _follow(client)  # blank: the typed question is used
-    assert "Question: check again" in ai.users[1]
+    assert "Question: check it once more" in ai.users[1]
 
 
 def test_a_follow_up_search_word_from_the_record_still_needs_to_be_typed():
@@ -1498,13 +1522,14 @@ def test_a_follow_up_search_word_from_the_record_still_needs_to_be_typed():
     plan = _Plan(kind="general", search_words="metformin food",
                  full_question="What can I eat with metformin?")  # the model's words never count
     _, _, search, client = _world(plan=plan)
-    body = _follow(client, "check again",
+    body = _follow(client, "check it once more",
                    {"question": "What can I eat?", "points": ["Eat fruit."]}).json()
     assert search.queries == [] and body["note"] == "Try asking in more general words."
     # Typed in the previous question: allowed.
     plan = _Plan(kind="general", search_words="metformin food")
     _, _, search, client = _world(plan=plan)
-    _follow(client, "check again", {"question": "Can I eat rice with metformin?", "points": []})
+    _follow(client, "check it once more",
+            {"question": "Can I eat rice with metformin?", "points": []})
     assert len(search.queries) == 1
 
 
