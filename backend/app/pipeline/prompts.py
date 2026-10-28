@@ -142,11 +142,20 @@ Return:
   habit or condition the question is about, in general terms ("diabetes breakfast", "turmeric milk
   cold"). No digits. No names of people. Nothing personal: not an age, a place or a medicine dose.
   Empty for "record" and "not_health".
+- `full_question`: only when a previous question is given and the new question is a short
+  follow-up that makes sense only with it: the new question written out in full, in one line
+  ("check again" gives the previous question again). Empty otherwise.
 
 You may also get the patient's previous question. If the new question leans on it ("what about
 mango?", "and at night?"), judge and write words for the new question together with the same food,
 habit or condition from the previous one. If it stands on its own, ignore the previous question.
-"""  # ASK_SEARCH v3 (2026-10-27: record / general / both / not_health)
+
+When a previous question is given and the new question is a short follow-up that leans on it
+("check again", "try again", "and last year?", "what about my cholesterol?", "why?"), classify it
+as the previous question would be, with that context, and fill `full_question`. "check again" or
+"try again" means the previous question again. A follow-up is never `not_health` just because it
+is short.
+"""  # ASK_SEARCH v4 (2026-10-28: follow-ups lean on the previous question, full_question)
 
 ASK_RECORD = """A patient asks a question about their own health record. You get the question and a
 numbered list of the patient's confirmed record items, each with an id. A test value may also

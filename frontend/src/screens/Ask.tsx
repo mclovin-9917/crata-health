@@ -73,10 +73,14 @@ export default function AskScreen() {
   const ask = async (q: string) => {
     const text = q.trim();
     if (!text || busy) return;
-    const last = thread[thread.length - 1];
-    // The server gets only the question before this one and its points, so "what about mango?" has
-    // something to lean on. Nothing is stored there.
-    const previous = last && last.answer.points.length > 0
+    // The server gets only the last question that was really answered (not a "not a health question"
+    // or an emergency card) and its web points, so "what about mango?" or "check again" has something
+    // to lean on. A record answer sends the question alone. Nothing is stored there, and no record
+    // item is ever sent.
+    const last = [...thread].reverse().find(
+      (t) => !t.answer.urgent && t.answer.kind !== "not_health" && (t.answer.kind || t.answer.health_question),
+    );
+    const previous = last
       ? { question: last.question, points: last.answer.points.map((p) => p.text) }
       : null;
     setPending(text);

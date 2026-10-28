@@ -1405,6 +1405,117 @@ def test_a_follow_up_may_search_with_a_condition_typed_in_the_question_it_follow
     assert search.queries == []  # nothing typed named it
 
 
+def _follow(client, question="check again", previous=None):
+    previous = previous or {"question": "How have my sugar levels been?", "points": []}
+    return client.post(f"/patients/{PID}/ask", json={"question": question, "previous": previous})
+
+
+def test_check_again_after_a_record_answer_is_a_record_question_with_the_previous_one():
+    plan = _Plan(kind="record", full_question="How have my sugar levels been?")
+    _, ai, search, client = _world(plan=plan)
+    body = _follow(client).json()
+    assert body["kind"] == "record" and body["health_question"] is True
+    assert len(body["record_items"]) == 1 and search.queries == []
+    assert ai.calls == ["_Plan", "_RecordAnswer"]
+    assert "Previous question (context only): How have my sugar levels been?" in ai.users[0]
+    assert "Question: check again" in ai.users[0]
+    assert "Question: How have my sugar levels been?" in ai.users[1]  # the record part
+    assert "check again" not in ai.users[1].split("Question:")[1]
+    assert "full_question" not in body
+
+
+def test_the_full_question_also_goes_to_the_web_answer_and_the_allergy_note():
+    plan = _Plan(kind="general", search_words="rice breakfast",
+                 full_question="Can I eat peanut butter with rice?")
+    _, ai, search, client = _world(plan=plan)
+    body = _follow(client, "try again").json()
+    assert len(search.queries) == 1
+    assert "Question: Can I eat peanut butter with rice?" in ai.users[1]
+    assert body["allergy_notes"] == ["Your record lists an allergy to Peanut."]
+
+
+def test_an_allergen_typed_by_the_patient_is_noted_even_if_the_model_rewords_the_question():
+    plan = _Plan(kind="general", search_words="rice breakfast",
+                 full_question="What about nut butters with rice?")
+    _, _, _, client = _world(plan=plan)
+    body = _follow(client, "what about peanut butter?").json()
+    assert body["allergy_notes"] == ["Your record lists an allergy to Peanut."]
+    plan = _Plan(kind="record", full_question="Do I have a peanut allergy?")  # only the model's
+    _, _, _, client = _world(plan=plan)
+    assert _follow(client, "check again").json()["allergy_notes"] == [
+        "Your record lists an allergy to Peanut."]
+
+
+def test_a_follow_up_is_read_with_the_question_before_it_for_warning_signs():
+    _, ai, search, client = _world()
+    prev = {"question": "I have a high fever, what can I eat?", "points": []}
+    body = client.post(f"/patients/{PID}/ask", json={
+        "question": "and my neck is stiff, is that ok?", "previous": prev}).json()
+    assert body["urgent"] is True and "High fever with a stiff neck" in body["warning_signs"]
+    assert ai.calls == [] and search.queries == []
+    _, ai, _, client = _world()  # an ordinary follow-up to an ordinary question
+    prev = {"question": "Can I eat rice with diabetes?", "points": []}
+    body = client.post(f"/patients/{PID}/ask", json={"question": "and at night?",
+                                                     "previous": prev}).json()
+    assert body["urgent"] is False and ai.calls
+
+
+def test_the_models_full_question_is_checked_for_warning_signs_too():
+    plan = _Plan(kind="general", search_words="rice",
+                 full_question="Can I eat rice if I want to die?")
+    _, ai, search, client = _world(plan=plan)
+    body = _follow(client, "and rice?").json()
+    assert body["urgent"] is True and body["helpline"] and search.queries == []
+    assert ai.calls == ["_Plan"]
+
+
+def test_a_full_question_is_ignored_without_a_previous_question():
+    plan = _Plan(kind="record", full_question="How have my sugar levels been?")
+    _, ai, _, client = _world(plan=plan)
+    assert client.post(f"/patients/{PID}/ask", json={"question": "check again"}).status_code == 200
+    assert "Question: check again" in ai.users[1]
+    assert "sugar levels" not in ai.users[1].split("The patient's confirmed record")[0]
+    _, ai, _, client = _world(plan=plan)  # an empty previous question counts as none
+    _follow(client, previous={"question": "  ", "points": []})
+    assert "Question: check again" in ai.users[1]
+
+
+def test_a_full_question_is_one_line_and_at_most_200_characters():
+    messy = "How  have\n my   sugar\tlevels been? " + "x" * 300
+    plan = _Plan(kind="record", full_question=messy)
+    _, ai, _, client = _world(plan=plan)
+    _follow(client)
+    asked = ai.users[1].split("Question: ")[1].split("\n\nThe patient's")[0]
+    assert asked.startswith("How have my sugar levels been? xxx")
+    assert "\n" not in asked and len(asked) <= 200
+    _, ai, _, client = _world(plan=_Plan(kind="record", full_question="   "))
+    _follow(client)  # blank: the typed question is used
+    assert "Question: check again" in ai.users[1]
+
+
+def test_a_follow_up_search_word_from_the_record_still_needs_to_be_typed():
+    # "metformin" is in the record but in neither the typed question nor the previous one.
+    plan = _Plan(kind="general", search_words="metformin food",
+                 full_question="What can I eat with metformin?")  # the model's words never count
+    _, _, search, client = _world(plan=plan)
+    body = _follow(client, "check again",
+                   {"question": "What can I eat?", "points": ["Eat fruit."]}).json()
+    assert search.queries == [] and body["note"] == "Try asking in more general words."
+    # Typed in the previous question: allowed.
+    plan = _Plan(kind="general", search_words="metformin food")
+    _, _, search, client = _world(plan=plan)
+    _follow(client, "check again", {"question": "Can I eat rice with metformin?", "points": []})
+    assert len(search.queries) == 1
+
+
+def test_the_search_prompt_is_v4_and_reads_a_short_follow_up_with_the_previous_question():
+    from app.pipeline.prompts import ASK_SEARCH
+    flat = " ".join(ASK_SEARCH.split())
+    assert "`full_question`" in flat
+    assert '"check again" or "try again" means the previous question again' in flat
+    assert "never `not_health` just because it is short" in flat
+
+
 def test_a_dose_is_only_dropped_from_the_detail_when_the_whole_token_is_in_the_label():
     db, _, _, _ = _world()
     _confirmed(db, kind=EntryKind.MEDICATION, label="Thyroxine 125mcg",

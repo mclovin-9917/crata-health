@@ -533,6 +533,20 @@ def reserve_questions(db: Storage, account_id: str, now: datetime | None = None)
 class _Plan(BaseModel):
     kind: str = "general"  # record | general | both | not_health
     search_words: str = ""
+    # The question written out in full when it is a short follow-up ("check again"); else "".
+    full_question: str = ""
+
+
+MAX_FULL_QUESTION_CHARS = 200
+
+
+def _full_question(text: str, previous: AskPrevious | None) -> str:
+    """The model's full wording of a short follow-up, cleaned by code: one line, at most 200
+    characters, and only when there is a previous question to lean on. It never reaches the screen."""
+    if previous is None or not previous.question.strip():
+        return ""
+    clean = " ".join(text.split())
+    return clean[:MAX_FULL_QUESTION_CHARS].rstrip()
 
 
 class _RecordAnswer(BaseModel):
@@ -973,10 +987,16 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         now: datetime | None = None, previous: AskPrevious | None = None) -> AskAnswer:
     """The steps of plan section 2. May raise DailyLimit, AIError or SearchError."""
     now = now or datetime.now(UTC)
-    signs = warning_signs(question)
-    if signs:  # no limit used, no model, no search
+
+    def urgent(signs: list[str]) -> AskAnswer:
         return AskAnswer(urgent=True, warning_signs=signs, note=URGENT_NOTE,
                          helpline=HELPLINE if _SELF_HARM in signs else None)
+
+    # A follow-up is also read with the question it leans on ("high fever" then "my neck is stiff").
+    prior = previous.question if previous and previous.question.strip() else ""
+    signs = warning_signs(question) or (warning_signs(f"{prior} {question}") if prior else [])
+    if signs:  # no limit used, no model, no search
+        return urgent(signs)
     if db.count_asks(account_id, now - timedelta(days=1)) >= ASKS_PER_DAY:
         raise DailyLimit(LIMIT_MESSAGE)
     db.record_ask(account_id, now)
@@ -989,6 +1009,12 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
     kind = plan.kind.strip().casefold()
     if kind not in ("record", "general", "both", "not_health"):
         kind = "general"
+    # A short follow-up ("check again") is read as the question it leans on.
+    effective = _full_question(plan.full_question, previous) or question
+    if effective != question and (signs := warning_signs(effective)):
+        return urgent(signs)  # the model's wording is checked too, by code
+    # The typed words and the model's wording both count for an allergen the patient named.
+    said = f"{question} {effective}" if effective != question else question
     if kind == "not_health":
         return AskAnswer(kind="not_health", health_question=False, note=NOT_HEALTH_NOTE,
                          models_used=sorted(set(used)))
@@ -1004,14 +1030,14 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
     if kind in ("record", "both"):
         try:
             out.record_items, out.record_summary = _record_part(
-                question, record_items_for(entries, encounters, today), ai, context)
+                effective, record_items_for(entries, encounters, today), ai, context)
             out.charts = charts_for(out.record_items, entries, encounters)
         except AIError:
             if kind == "record":
                 raise
         if kind == "record":
             out.note = RECORD_NOTE if out.record_items else RECORD_NONE_NOTE
-            out.allergy_notes = allergy_notes(record.allergies, question)
+            out.allergy_notes = allergy_notes(record.allergies, said)
             out.models_used = models()
             return out
 
@@ -1023,17 +1049,17 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
     if not check_search_words(words, patient.name, labels, typed):
         if kind == "both" and out.record_items:  # the record part alone is still an answer
             out.note = RECORD_NOTE
-            out.allergy_notes = allergy_notes(record.allergies, question)
+            out.allergy_notes = allergy_notes(record.allergies, said)
             out.models_used = models()
             return out
         out.note = GENERAL_WORDS_NOTE
-        out.allergy_notes = allergy_notes(record.allergies, question)
+        out.allergy_notes = allergy_notes(record.allergies, said)
         out.models_used = models()
         return out
 
     results, searched = cached_search(words + SEARCH_SUFFIX, db, search, now)
     results = [r for r in results if not NOT_FOR_PATIENTS.search(r.url)]
-    out.allergy_notes = allergy_notes(record.allergies, question)
+    out.allergy_notes = allergy_notes(record.allergies, said)
     out.considered = considered_conditions(record.conditions, words)
     if not results:
         out.note = ((RECORD_NOTE if kind == "both" else ASK_NOTE) if out.record_items
@@ -1046,7 +1072,7 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         ("Current medicines", record.medicines)))
     answer = ai.reason_json(
         prompts.ASK_ANSWER,
-        f"{context}Question: {question}\n\nFrom the patient's record:\n{facts}\n\n"
+        f"{context}Question: {effective}\n\nFrom the patient's record:\n{facts}\n\n"
         f"Sources:\n{_sources_block(results)}", _Answer, max_tokens=4096, thinking=False,
         temperature=0.0)
     for p in answer.points:
@@ -1077,6 +1103,6 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         out.note = (NO_ANSWER_NOTE if not out.record_items
                     else RECORD_NOTE if kind == "both" else ASK_NOTE)
     else:
-        out.summary = _summary_of_points(question, out.points, ai, record.medicines)
+        out.summary = _summary_of_points(effective, out.points, ai, record.medicines)
     out.models_used = models()
     return out
