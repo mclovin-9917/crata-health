@@ -34,8 +34,47 @@ export function chartLabel(series: NumberSeries[]): string {
 export const bandedSeries = (series: NumberSeries[]) =>
   series.filter((s) => s.range && rangeWords(s.range) && s.points.some((p) => !p.removed));
 
+/** The part of a line's name that tells the lines of one card apart ("systolic"). */
+export const lineName = (s: NumberSeries) => plainName(s.name.match(/\(([^)]+)\)\s*$/)?.[1] ?? s.name);
+
+/** Common short names a lab report uses, said the way a patient would. */
+const PLAIN: Record<string, string> = {
+  hb: "Haemoglobin", hba1c: "HbA1c (3-month sugar)", fbs: "Fasting sugar", ppbs: "Sugar after a meal", rbs: "Random sugar",
+  ldl: "LDL cholesterol", hdl: "HDL cholesterol", tsh: "Thyroid (TSH)", wbc: "White blood cells", rbc: "Red blood cells",
+  sgpt: "Liver enzyme (SGPT)", alt: "Liver enzyme (ALT)", sgot: "Liver enzyme (SGOT)", ast: "Liver enzyme (AST)",
+};
+
+/** A raw key ("blood_pressure_systolic", "hb") shown as plain words; a name already in words is left alone. */
+export function plainName(name: string): string {
+  const known = PLAIN[name.trim().toLowerCase()];
+  if (known) return known;
+  if (!/[_]/.test(name) && name !== name.toLowerCase()) return name;
+  const words = name.replace(/[_]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** What the shaded band means, one line per line that has one (the band itself carries no text).
+ * The second band is drawn with a dashed edge, and its line says so. */
+export function BandNotes({ series }: { series: NumberSeries[] }) {
+  const several = series.length > 1;
+  const banded = bandedSeries(series);
+  if (!banded.length) return null;
+  return (
+    <div className="space-y-0.5 text-xs text-ink-600">
+      {banded.map((s, i) => (
+        <p key={`${s.key}-${s.unit}-band`}>
+          {several ? `${lineName(s)} shaded band` : "Shaded band"}{i > 0 ? " (dashed edge)" : ""}: {rangeWords(s.range!)},
+          printed on your {s.range!.on ? `${formatDate(s.range!.on)} ` : ""}report
+        </p>
+      ))}
+    </div>
+  );
+}
+
 // A line is teal, a second line (diastolic) blue; a dot outside its range is amber.
 const LINE = ["text-tide-600", "text-lagoon-600"];
+/** The colour class of the i-th line of a chart, for a legend that matches it. */
+export const lineTone = (i: number) => LINE[i % LINE.length];
 
 /** A small line chart in plain SVG. Time runs left to right; each reading is a dot, the latest
  * printed range is a pale band, and a dot outside its range is amber. Readings the patient

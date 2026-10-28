@@ -1,15 +1,16 @@
 import { AlertTriangle, ChevronDown, Pencil, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type NumberPoint, type NumberSeries, type NumbersGroup, type Preset } from "../api";
 import { useMe } from "../App";
-import { bandedSeries, Chart, rangeWords, shown } from "../charts";
+import { BandNotes, Chart, lineName, plainName, rangeWords, shown } from "../charts";
 import { ErrorNote, Note } from "../components";
 import { formatDate, go, useLoad } from "../lib";
 
 /** My health numbers: every number in the record over time, from the reports and from readings
  * the patient adds. A number is compared only with a range printed on a report (its own, or the
- * latest one for the same measure); the screen never says what a number means. */
-export default function NumbersScreen() {
+ * latest one for the same measure); the screen never says what a number means. `openKey` (from
+ * #/numbers/<measure key>, as linked from Ask about my health) opens that measure's row. */
+export default function NumbersScreen({ openKey }: { openKey?: string }) {
   const me = useMe();
   const { data, error, reload } = useLoad(() => api.numbers(me.id), [me.id]);
   const [adding, setAdding] = useState(false);
@@ -46,7 +47,7 @@ export default function NumbersScreen() {
           Nothing here yet. Add a reading, like blood pressure or weight, or add a lab report to a visit.
         </div>
       )}
-      {data && data.groups.length > 0 && <NumbersTable groups={data.groups} onChanged={reload} />}
+      {data && data.groups.length > 0 && <NumbersTable groups={data.groups} onChanged={reload} initialOpen={openKey} />}
       {data && data.groups.length > 0 && (
         <p className="px-1 text-xs text-ink-500">
           Ranges differ between labs and between people. Units are never converted. Ask your doctor what a number
@@ -55,25 +56,6 @@ export default function NumbersScreen() {
       )}
     </div>
   );
-}
-
-/** The part of a line's name that tells the lines of one card apart ("systolic"). */
-const lineName = (s: NumberSeries) => plainName(s.name.match(/\(([^)]+)\)\s*$/)?.[1] ?? s.name);
-
-/** Common short names a lab report uses, said the way a patient would. */
-const PLAIN: Record<string, string> = {
-  hb: "Haemoglobin", hba1c: "HbA1c (3-month sugar)", fbs: "Fasting sugar", ppbs: "Sugar after a meal", rbs: "Random sugar",
-  ldl: "LDL cholesterol", hdl: "HDL cholesterol", tsh: "Thyroid (TSH)", wbc: "White blood cells", rbc: "Red blood cells",
-  sgpt: "Liver enzyme (SGPT)", alt: "Liver enzyme (ALT)", sgot: "Liver enzyme (SGOT)", ast: "Liver enzyme (AST)",
-};
-
-/** A raw key ("blood_pressure_systolic", "hb") shown as plain words; a name already in words is left alone. */
-function plainName(name: string): string {
-  const known = PLAIN[name.trim().toLowerCase()];
-  if (known) return known;
-  if (!/[_]/.test(name) && name !== name.toLowerCase()) return name;
-  const words = name.replace(/[_]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** "Above the printed range (4 to 5.6)" or "Above the range on your 14 Sep 2026 report (70 to 100)". */
@@ -95,10 +77,17 @@ const NARROW = "max-md:w-0 max-md:overflow-hidden max-md:p-0";
 /** The numbers as a lab-report table: one row per measure, newest reading first. A row opens
  * to its chart and readings: clicking anywhere on the row toggles it (onClick on the row), and the
  * measure's name inside it is the real button, for the keyboard and screen readers. */
-function NumbersTable({ groups, onChanged }: { groups: NumbersGroup[]; onChanged: () => void }) {
-  const [openKey, setOpenKey] = useState<string | null>(null);
+function NumbersTable({ groups, onChanged, initialOpen }: { groups: NumbersGroup[]; onChanged: () => void; initialOpen?: string }) {
+  const [openKey, setOpenKey] = useState<string | null>(() => (initialOpen && groups.some((g) => g.key === initialOpen) ? initialOpen : null));
+  const box = useRef<HTMLDivElement>(null);
+  // A link from an answer lands on its measure: bring the opened row into view once.
+  useEffect(() => {
+    if (!initialOpen || openKey !== initialOpen) return;
+    box.current?.querySelector("[aria-expanded='true']")?.scrollIntoView({ block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
-    <div className="card p-2 sm:p-3">
+    <div className="card p-2 sm:p-3" ref={box}>
       <table className="w-full table-fixed border-collapse text-left text-sm">
         <caption className="sr-only">
           One row for each measure. Select a row to open its chart and readings.
@@ -265,24 +254,6 @@ function GroupRows({ group, open, onToggle, onChanged }: {
         </tr>
       )}
     </tbody>
-  );
-}
-
-/** What the shaded band means, one line per line that has one (the band itself carries no text).
- * The second band is drawn with a dashed edge, and its line says so. */
-function BandNotes({ series }: { series: NumberSeries[] }) {
-  const several = series.length > 1;
-  const banded = bandedSeries(series);
-  if (!banded.length) return null;
-  return (
-    <div className="space-y-0.5 text-xs text-ink-600">
-      {banded.map((s, i) => (
-        <p key={`${s.key}-${s.unit}-band`}>
-          {several ? `${lineName(s)} shaded band` : "Shaded band"}{i > 0 ? " (dashed edge)" : ""}: {rangeWords(s.range!)},
-          printed on your {s.range!.on ? `${formatDate(s.range!.on)} ` : ""}report
-        </p>
-      ))}
-    </div>
   );
 }
 

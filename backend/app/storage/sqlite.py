@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -301,6 +301,35 @@ class Storage:
             db.execute("DELETE FROM entries WHERE encounter_id = ?", (encounter_id,))
             db.execute("DELETE FROM encounters WHERE id = ?", (encounter_id,))
 
+    def merge_encounter(self, keep: Encounter, remove_id: str, *,
+                        expect: Sequence[Encounter] = ()) -> None:
+        """Save `keep` (with the entries moved into it) and erase the visit `remove_id`, in one
+        transaction: either both happen or neither. Entries of the erased visit that were moved
+        into `keep` are saved under it first, so the delete only takes what was left behind.
+
+        `expect` are the visits as they were loaded before the change was worked out (copies,
+        taken before anything was moved). If any of them is not exactly as stored now (it was
+        read again, a suggestion was confirmed, anything), nothing is written and `Changed` is
+        raised, so the change never lands on a stale picture."""
+        for e in keep.entries:
+            e.patient_id, e.encounter_id = keep.patient_id, keep.id
+        with self._tx() as db:
+            for before in expect:
+                if _stored(db, before.id) != _fingerprint(before):
+                    raise Changed(before.id)
+            _upsert(
+                db,
+                "encounters",
+                id=keep.id,
+                patient_id=keep.patient_id,
+                created_at=keep.created_at.isoformat(),
+                data=keep.model_dump_json(exclude={"entries"}),
+            )
+            for e in keep.entries:
+                _upsert_entry(db, e)
+            db.execute("DELETE FROM entries WHERE encounter_id = ?", (remove_id,))
+            db.execute("DELETE FROM encounters WHERE id = ?", (remove_id,))
+
     def list_encounters(self, patient_id: str) -> list[Encounter]:
         """Newest first, without their entries (use get_encounter for one in full)."""
         return self._many(
@@ -443,6 +472,26 @@ class Storage:
             db.execute(f"DELETE FROM trusted_links WHERE patient_id IN ({marks}) "
                        f"OR trusted_id IN ({marks})", person_ids * 2)
             db.execute(f"DELETE FROM patients WHERE id IN ({marks})", person_ids)
+
+
+class Changed(Exception):
+    """A visit changed between loading it and saving a change worked out from it."""
+
+
+def _fingerprint(enc: Encounter) -> tuple[str, list[str]]:
+    return enc.model_dump_json(exclude={"entries"}), [e.model_dump_json() for e in enc.entries]
+
+
+def _stored(db: sqlite3.Connection, encounter_id: str) -> tuple[str, list[str]] | None:
+    """The visit as stored now, in the same shape as `_fingerprint` (validated on both sides, so
+    a row saved before a field existed still compares equal to its own loaded copy)."""
+    row = db.execute("SELECT data FROM encounters WHERE id = ?", (encounter_id,)).fetchone()
+    if row is None:
+        return None
+    enc = Encounter.model_validate_json(row[0])
+    enc.entries = [Entry.model_validate_json(r[0]) for r in db.execute(
+        "SELECT data FROM entries WHERE encounter_id = ? ORDER BY rowid", (encounter_id,))]
+    return _fingerprint(enc)
 
 
 def _upsert(db: sqlite3.Connection, table: str, **row: object) -> None:

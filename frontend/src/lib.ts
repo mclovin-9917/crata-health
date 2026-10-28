@@ -163,6 +163,7 @@ export const stepLabels: Record<string, string> = {
   extracting: "Finding facts",
   checking_medicines: "Checking medicine names",
   cross_checking: "Checking the bill and your allergies",
+  matching_report: "Checking whether it belongs to an earlier visit",
 };
 
 /** Seconds from a locator like "00:26-01:00" (start of the span). */

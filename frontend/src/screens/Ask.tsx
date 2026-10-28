@@ -1,140 +1,193 @@
-import { AlertTriangle, ExternalLink, FileText, Lightbulb, Loader2, ShieldAlert, Sparkles, Stethoscope } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
-import { api, type AskAnswer, type AskCategory, type AskPoint, type AskRecordItem, type AskSource } from "../api";
+import {
+  AlertTriangle, ArrowUp, ExternalLink, FileText, Globe, LineChart, Lightbulb, Loader2, Plus, ShieldAlert, Sparkles, Stethoscope,
+} from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { api, type AskAnswer, type AskCategory, type AskChart, type AskPoint, type AskRecordItem, type AskSource } from "../api";
 import { useMe } from "../App";
 import { EmergencyNow } from "../assist";
+import { BandNotes, Chart, lineName, lineTone, plainName, shown } from "../charts";
 import { ErrorNote } from "../components";
+import { formatDate } from "../lib";
 import { appendText, VoiceButton } from "../voice";
 
-const EXAMPLES = ["What tablets am I taking for BP?", "Is papaya good for me?", "What should I eat with high blood pressure?"];
-const KEEP = 5;
-const storeKey = (personId: string) => `crata.askAnswers.${personId}`;
+const EXAMPLES = [
+  "How have my sugar levels been?",
+  "What tablets am I taking for BP?",
+  "Is papaya good for me?",
+  "What should I eat with high blood pressure?",
+];
+const KEEP = 10;
+const storeKey = (personId: string) => `crata.askThread.${personId}`;
 
-interface Saved { question: string; answer: AskAnswer }
+/** One question and its answer. The thread lives in this browser tab only (never on the server). */
+interface Turn { question: string; answer: AskAnswer }
 
-function readSaved(personId: string): Saved[] {
+/** Oldest first. Read back after a trip to a visit or a report, so the way back finds the thread. */
+function readThread(personId: string): Turn[] {
   try {
     const raw = sessionStorage.getItem(storeKey(personId));
     const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list.slice(0, KEEP) : [];
+    return Array.isArray(list)
+      ? list.filter((t) => t && typeof t.question === "string" && t.answer && Array.isArray(t.answer.points)).slice(-KEEP)
+      : [];
   } catch {
     return [];
   }
 }
 
-function writeSaved(personId: string, list: Saved[]) {
+function writeThread(personId: string, list: Turn[]) {
   try {
-    sessionStorage.setItem(storeKey(personId), JSON.stringify(list.slice(0, KEEP)));
+    if (list.length === 0) sessionStorage.removeItem(storeKey(personId));
+    else sessionStorage.setItem(storeKey(personId), JSON.stringify(list.slice(-KEEP)));
   } catch {
-    // storage blocked: answers just are not kept
+    // storage blocked: the thread just is not kept
   }
 }
 
-/** Ask about food, diet or daily life. Answers come from trusted sites and are not stored on the server. */
+const reducedMotion = () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const touchScreen = () => typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+
+/** Ask about my health, as a conversation: the patient's questions and the answers stay on screen in
+ * order, one question box under them. Answers come from the patient's confirmed record and from
+ * trusted health sites. */
 export default function AskScreen() {
   const me = useMe();
+  const [thread, setThread] = useState<Turn[]>(() => readThread(me.id));
+  const [pending, setPending] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ text: string; from: "main" | "follow" } | null>(null);
-  const [saved, setSaved] = useState<Saved[]>(() => readSaved(me.id));
+  const [error, setError] = useState<string | null>(null);
+  const newest = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLInputElement>(null);
+  const first = useRef(true);
+  const busy = pending !== null;
 
-  const [followUp, setFollowUp] = useState("");
+  // The page follows the conversation: the newest question comes to the top of the screen.
+  useEffect(() => {
+    const isFirst = first.current;
+    first.current = false;
+    if (isFirst && thread.length === 0) return;
+    newest.current?.scrollIntoView({ block: "start", behavior: isFirst || reducedMotion() ? "auto" : "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread.length, pending]);
 
-  const ask = async (q: string, previous?: Saved) => {
+  const ask = async (q: string) => {
     const text = q.trim();
     if (!text || busy) return;
-    setBusy(true);
+    const last = thread[thread.length - 1];
+    // The server gets only the question before this one and its points, so "what about mango?" has
+    // something to lean on. Nothing is stored there.
+    const previous = last && last.answer.points.length > 0
+      ? { question: last.question, points: last.answer.points.map((p) => p.text) }
+      : null;
+    setPending(text);
+    setQuestion("");
     setError(null);
     try {
-      const prev = previous && previous.answer.points.length > 0
-        ? { question: previous.question, points: previous.answer.points.map((p) => p.text) }
-        : null;
-      const answer = await api.ask(me.id, text, prev);
-      const next = [{ question: text, answer }, ...saved].slice(0, KEEP);
-      setSaved(next);
-      writeSaved(me.id, next);
-      if (previous) setFollowUp("");
-      else setQuestion("");
+      const answer = await api.ask(me.id, text, previous);
+      const next = [...thread, { question: text, answer }].slice(-KEEP);
+      setThread(next);
+      writeThread(me.id, next);
     } catch (e) {
-      setError({ text: (e as Error).message, from: previous ? "follow" : "main" });
+      setError((e as Error).message);
+      setQuestion(text); // nothing is lost: edit it or send it again
     } finally {
-      setBusy(false);
+      setPending(null);
+      if (!touchScreen()) box.current?.focus();
     }
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     void ask(question);
   };
+  const clear = () => {
+    setThread([]);
+    setError(null);
+    writeThread(me.id, []);
+  };
 
+  const empty = thread.length === 0 && !busy;
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="title">Ask about my health</h1>
-        <p className="mt-1 text-ink-600">Food, diet and daily life, from trusted health sites.</p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1 basis-60">
+          <h1 className="title">Ask about my health</h1>
+          <p className="mt-1 text-ink-600">Answers come from your record and from trusted health sites.</p>
+        </div>
+        {thread.length > 0 && !busy && (
+          <button type="button" className="link-quiet" onClick={clear}>Clear conversation</button>
+        )}
       </div>
 
-      <form className="card space-y-4" onSubmit={submit}>
-        <div>
-          <label className="label" htmlFor="ask-q">Ask about food, diet or daily life</label>
+      <div className="space-y-5" role="log" aria-label="Conversation" aria-live="polite">
+        {empty && (
+          <div className="card space-y-3">
+            <p className="text-sm text-ink-700">
+              Ask about your medicines, allergies, conditions or test results, or about food, diet and daily life.
+            </p>
+            <div className="flex flex-wrap gap-2" aria-label="Examples">
+              {EXAMPLES.map((ex) => (
+                <button key={ex} type="button" className="btn-light min-h-11 text-left whitespace-normal" onClick={() => void ask(ex)}>
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {thread.map((t, i) => (
+          <div key={i} ref={i === thread.length - 1 && !busy ? newest : undefined} className="scroll-mt-20 space-y-3">
+            <Bubble text={t.question} />
+            <Answer answer={t.answer} />
+          </div>
+        ))}
+
+        {pending !== null && (
+          <div ref={newest} className="scroll-mt-20 space-y-3">
+            <Bubble text={pending} />
+            <div className="card flex items-center gap-2 text-sm text-ink-700" role="status">
+              <Loader2 size={16} className="shrink-0 animate-spin" aria-hidden />
+              Checking your record and trusted sites. This can take up to 30 seconds.
+            </div>
+          </div>
+        )}
+        <ErrorNote error={error} />
+      </div>
+
+      <form
+        className="card sticky bottom-3 z-10 space-y-2 p-3"
+        onSubmit={submit}
+        aria-label="Ask a question"
+      >
+        <div className="flex items-center gap-2">
+          <label className="sr-only" htmlFor="ask-q">Your question</label>
           <input
             id="ask-q"
-            className="input"
+            ref={box}
+            className="input min-h-11 min-w-0 flex-1"
             maxLength={500}
+            placeholder={thread.length ? "Ask a follow-up" : "Ask about your record, food or daily life"}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            disabled={busy}
+            readOnly={busy}
           />
-          <div className="mt-2">
-            <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setQuestion((cur) => appendText(cur, t))} />
-          </div>
+          <button className="btn min-h-11 shrink-0" type="submit" disabled={busy || !question.trim()}>
+            {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <ArrowUp size={16} aria-hidden />} Ask
+          </button>
         </div>
-        <div className="flex flex-wrap gap-2" aria-label="Examples">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              className="btn-light text-left whitespace-normal"
-              disabled={busy}
-              onClick={() => { setQuestion(ex); void ask(ex); }}
-            >
-              {ex}
-            </button>
-          ))}
-        </div>
-        <button className="btn w-full sm:w-auto" type="submit" disabled={busy || !question.trim()}>
-          {busy ? <><Loader2 size={16} className="animate-spin" aria-hidden /> Looking it up…</> : "Ask"}
-        </button>
-        {busy && <p className="text-sm text-ink-600" role="status">Checking trusted sites. This can take up to 30 seconds.</p>}
-        <ErrorNote error={error?.from === "main" ? error.text : null} />
+        <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setQuestion((cur) => appendText(cur, t))} />
       </form>
+    </div>
+  );
+}
 
-      {saved.map((s, i) => (
-        <section key={i} className="space-y-3" aria-label="Answer">
-          <h2 className="section-title">{s.question}</h2>
-          <Answer answer={s.answer} />
-          {i === 0 && s.answer.health_question && !s.answer.urgent && (
-            <form
-              className="card space-y-3"
-              onSubmit={(e) => { e.preventDefault(); void ask(followUp, s); }}
-            >
-              <label className="label" htmlFor="ask-follow">Ask a follow-up</label>
-              <input
-                id="ask-follow"
-                className="input"
-                maxLength={500}
-                value={followUp}
-                onChange={(e) => setFollowUp(e.target.value)}
-                disabled={busy}
-              />
-              <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setFollowUp((cur) => appendText(cur, t))} />
-              <button className="btn w-full sm:w-auto" type="submit" disabled={busy || !followUp.trim()}>
-                {busy ? <><Loader2 size={16} className="animate-spin" aria-hidden /> Looking it up…</> : "Ask"}
-              </button>
-              <ErrorNote error={error?.from === "follow" ? error.text : null} />
-            </form>
-          )}
-        </section>
-      ))}
+/** The patient's question, on the right. */
+function Bubble({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end">
+      <p className="max-w-[85%] rounded-2xl rounded-br-md bg-lagoon-700 px-4 py-2.5 text-sm break-words text-white">
+        <span className="sr-only">You asked: </span>
+        {text}
+      </p>
     </div>
   );
 }
@@ -154,6 +207,7 @@ function sourcesOf(a: AskAnswer): AskSource[] {
 function Answer({ answer: a }: { answer: AskAnswer }) {
   const sources = a.kind === "record" ? [] : sourcesOf(a);
   const recordItems = a.record_items ?? [];
+  const charts = a.charts ?? [];
   const hasRecord = recordItems.length > 0 || !!a.record_summary;
   const note = a.kind === "record" && !a.note
     ? "From your confirmed record. Ask your doctor before changing any medicine."
@@ -162,12 +216,21 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
   if (a.kind === "not_health" || (!a.kind && !a.health_question)) {
     return (
       <div className="card text-sm text-ink-700">
-        This is not a health question, so there is nothing to look up. Try asking about food, diet or daily life.
+        This is not a health question, so there is nothing to look up. Try asking about your record, food, diet or daily life.
       </div>
     );
   }
+
+  const fromRecord = a.kind === "record" || hasRecord;
+  const fromWeb = a.points.length > 0 || a.kind === "general" || (a.kind === "both" && !hasRecord);
+  const nothingInRecord = a.kind === "record" && !hasRecord;
   return (
-    <div className="space-y-3">
+    <div className="card space-y-4">
+      <p className="flex items-center gap-1.5 text-xs font-bold tracking-wide text-ink-600 uppercase">
+        {fromRecord && !fromWeb ? <FileText size={14} aria-hidden /> : <Globe size={14} aria-hidden />}
+        {fromRecord && fromWeb ? "From your record and trusted health sites" : fromRecord ? "From your record" : "From trusted health sites"}
+      </p>
+
       {a.allergy_notes.length > 0 && (
         <ul className="space-y-1 rounded-2xl bg-red-50 px-4 py-3 ring-1 ring-red-200">
           {a.allergy_notes.map((n) => (
@@ -178,24 +241,20 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
         </ul>
       )}
 
+      {nothingInRecord && <NotInRecord note={a.note} />}
+
       {hasRecord && (
-        <section className="card space-y-3" aria-label="From your record">
-          <h3 className="flex items-center gap-1.5 text-base font-bold tracking-tight text-ink-900">
-            <FileText size={16} className="text-ink-600" aria-hidden /> From your record
-          </h3>
+        <section className="space-y-3" aria-label="From your record">
           {a.record_summary && <AiSummary text={a.record_summary} />}
-          {recordItems.length > 0 && (
-            <ul className="divide-y divide-ink-100">
-              {recordItems.map((it) => <RecordRow key={it.id} item={it} />)}
-            </ul>
-          )}
+          {charts.map((c) => <ChartBlock key={c.key} chart={c} />)}
+          <RecordList items={recordItems} charted={new Set(charts.map((c) => c.key))} />
         </section>
       )}
 
       {a.points.length === 0 ? (
-        !hasRecord && <div className="card text-sm text-ink-700">{note}</div>
+        !hasRecord && !nothingInRecord && <p className="text-sm text-ink-700">{note}</p>
       ) : (
-        <div className="card space-y-5">
+        <div className="space-y-5">
           {a.summary && <AiSummary text={a.summary} />}
           {SECTIONS.map((sec) => {
             const items = a.points.filter((p) => (p.category ?? "good_to_know") === sec.key);
@@ -244,6 +303,22 @@ function Answer({ answer: a }: { answer: AskAnswer }) {
   );
 }
 
+/** Nothing in the record answers a question about it: say so, and how to put it there. */
+function NotInRecord({ note }: { note: string }) {
+  const [head, ...rest] = (note || "").split(/(?<=\.)\s+/);
+  return (
+    <div className="space-y-3">
+      <p className="font-semibold text-ink-900">{head || "This hasn't been added to your record yet."}</p>
+      <p className="text-sm text-ink-700">
+        {rest.join(" ") || "Add the visit or report it comes from, and it will show up here."}
+      </p>
+      <a href="#/add" className="btn min-h-11">
+        <Plus size={16} aria-hidden /> Add a visit
+      </a>
+    </div>
+  );
+}
+
 function AiSummary({ text }: { text: string }) {
   return (
     <div className="space-y-1 border-l-2 border-l-ink-200 pl-3">
@@ -253,21 +328,115 @@ function AiSummary({ text }: { text: string }) {
   );
 }
 
-const KIND_LABELS: Record<string, string> = {
-  medicine: "Medicine", allergy: "Allergy", condition: "Condition", diagnosis: "Condition", test: "Test", event: "Event",
-};
+/** One measure the question was about, drawn like My health numbers, with its latest value and the
+ * ways on to the reports. The series comes from the patient's own numbers, never from the model. */
+function ChartBlock({ chart }: { chart: AskChart }) {
+  const several = chart.series.length > 1;
+  return (
+    <div className="space-y-2 rounded-2xl bg-white/60 p-3 ring-1 ring-ink-100">
+      <h3 className="flex items-center gap-1.5 text-base font-bold tracking-tight text-ink-900">
+        <LineChart size={16} className="text-ink-600" aria-hidden /> {plainName(chart.name)}
+      </h3>
+      <div className="space-y-1 text-sm">
+        {chart.series.map((s, i) => {
+          const p = s.latest;
+          if (!p) return null;
+          const outside = p.position === "high" || p.position === "low";
+          return (
+            <p key={`${s.key}-${s.unit}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {several && (
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold ${lineTone(i)}`}>
+                  <span className="size-2.5 rounded-full bg-current" aria-hidden />
+                  <span className="text-ink-700">{lineName(s)}</span>
+                </span>
+              )}
+              <span className="font-bold tabular-nums text-ink-900">
+                {shown(p.value)}{s.unit ? <span className="ml-1 text-xs font-semibold text-ink-600">{s.unit}</span> : null}
+              </span>
+              <span className="text-xs text-ink-600">on {formatDate(p.on)}</span>
+              {outside && (
+                <span className="chip bg-amber-100 text-amber-900">
+                  <AlertTriangle size={12} aria-hidden /> {p.position === "high" ? "Above range" : "Below range"}
+                </span>
+              )}
+            </p>
+          );
+        })}
+      </div>
+      <Chart series={chart.series} big />
+      <BandNotes series={chart.series} />
+      <div className="flex flex-wrap gap-2 pt-1">
+        {chart.report_link && (
+          <a href={`#${chart.report_link}`} className="btn-light min-h-11" aria-label={`See the latest ${plainName(chart.name)} report`}>
+            <FileText size={16} aria-hidden /> See latest report
+          </a>
+        )}
+        <a href={`#${chart.numbers_link}`} className="btn-light min-h-11" aria-label={`See all ${plainName(chart.name)} readings and reports`}>
+          <LineChart size={16} aria-hidden /> See all readings
+        </a>
+      </div>
+    </div>
+  );
+}
+
+const KIND_ORDER: { kind: string; title: string }[] = [
+  { kind: "allergy", title: "Allergies" },
+  { kind: "medicine", title: "Medicines" },
+  { kind: "condition", title: "Conditions" },
+  { kind: "test", title: "Tests" },
+  { kind: "event", title: "Events" },
+];
+const KIND_ALIAS: Record<string, string> = { diagnosis: "condition" };
+
+/** The record items of an answer, grouped by kind with a small heading each when there is more than one
+ * kind. A test whose measure is drawn above is not listed twice. */
+function RecordList({ items, charted }: { items: AskRecordItem[]; charted: Set<string> }) {
+  const shownItems = items.filter((it) => !(it.kind === "test" && it.group_key && charted.has(it.group_key)));
+  if (shownItems.length === 0) return null;
+  const kindOf = (it: AskRecordItem) => KIND_ALIAS[it.kind] ?? it.kind;
+  const known = new Set(KIND_ORDER.map((k) => k.kind));
+  const groups = [
+    ...KIND_ORDER.map((k) => ({ ...k, rows: shownItems.filter((it) => kindOf(it) === k.kind) })),
+    { kind: "other", title: "Other", rows: shownItems.filter((it) => !known.has(kindOf(it))) },
+  ].filter((g) => g.rows.length > 0);
+  return (
+    <div className="space-y-3">
+      {groups.map((g) => (
+        <section key={g.kind} aria-label={g.title}>
+          {groups.length > 1 && (
+            <h3 className="mb-1 text-xs font-bold tracking-wide text-ink-600 uppercase">{g.title}</h3>
+          )}
+          <ul className="divide-y divide-ink-100">
+            {g.rows.map((it) => <RecordRow key={it.id} item={it} />)}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 function RecordRow({ item }: { item: AskRecordItem }) {
   const allergy = item.kind === "allergy";
-  const label = KIND_LABELS[item.kind] ?? item.kind.charAt(0).toUpperCase() + item.kind.slice(1);
   return (
-    <li className="flex flex-wrap items-start gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0">
-      <span className={`chip shrink-0 ${allergy ? "bg-red-50 text-red-800 ring-1 ring-red-200" : "bg-ink-100 text-ink-800"}`}>
-        {allergy && <ShieldAlert size={12} aria-hidden />} {label}
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 first:pt-0 last:pb-0">
+      <span className="min-w-0 flex-1 basis-44 text-sm">
+        <span className="font-bold break-words text-ink-900">{item.label}</span>
+        {allergy && (
+          <span className="chip ml-2 bg-red-50 text-red-800 ring-1 ring-red-200"><ShieldAlert size={12} aria-hidden /> Allergy</span>
+        )}
+        {item.detail && <span className="block break-words text-ink-600">{item.detail}</span>}
       </span>
-      <span className="min-w-0 flex-1 basis-40 text-sm">
-        <span className="font-bold text-ink-900">{item.label}</span>
-        {item.detail && <span className="block text-ink-600">{item.detail}</span>}
+      <span className="flex flex-wrap gap-2">
+        {item.link && (
+          <a href={`#${item.link}`} className="btn-light min-h-11 px-3" aria-label={`${item.link_label || "Open"}: ${item.label}`}>
+            {item.link_label || "Open"}
+          </a>
+        )}
+        {item.numbers_link && (
+          <a href={`#${item.numbers_link}`} className="btn-light min-h-11 px-3" aria-label={`See ${item.label} on My health numbers`}>
+            See numbers
+          </a>
+        )}
       </span>
     </li>
   );

@@ -149,16 +149,29 @@ habit or condition from the previous one. If it stands on its own, ignore the pr
 """  # ASK_SEARCH v3 (2026-10-27: record / general / both / not_health)
 
 ASK_RECORD = """A patient asks a question about their own health record. You get the question and a
-numbered list of the patient's confirmed record items, each with an id.
+numbered list of the patient's confirmed record items, each with an id. A test value may also
+carry a "history": facts the app worked out (how many readings, the first one, the one before the
+latest, whether the latest is higher, lower or the same as the one before, and whether it is
+above, below or within the printed range).
 
 Return:
 - `item_ids`: the ids of the items that answer the question (only ids from the list; empty if
-  none do).
-- `summary`: at most 2 short plain sentences saying what those items show, using only those
-  items. Do not diagnose or advise. Never tell the reader to start, stop, skip or change a
-  medicine or dose, and give no dose or amount. If the items do not answer the question, say so
-  in one sentence.
-"""  # ASK_RECORD v1 (2026-10-27)
+  none do). For a question about a test or a measure ("how has my sugar been?"), pick every test
+  value in the list on that measure and on closely related measures: the app draws each picked
+  measure as a chart under your summary, with a link to its report.
+- `summary`: at most 2 short plain sentences that add what the list does not show. The patient
+  sees the picked items right under the summary, so do not read them back one by one. Say instead
+  how a measure has moved, whether the latest value is above, below or within its printed range,
+  how many items there are, or what is missing for the question. For movement and range use only
+  the words in the history ("higher", "lower", "the same"; "above", "below", "within the printed
+  range") and only for the measure they are given for; never work out a direction or a range
+  position yourself. Always call the range on a report the "printed range", never the "normal
+  range". Use only the picked items and their history, and only numbers that appear there. Never
+  use the words better, worse, good, bad, improved, worsened, normal, abnormal, controlled,
+  uncontrolled, healthy or concerning. Do not diagnose or advise. Never tell the reader to start,
+  stop, skip or change a medicine or dose, and give no dose or amount. If the items do not answer
+  the question, say so in one sentence.
+"""  # ASK_RECORD v3 (2026-10-28: code-counted direction and range words only, no judging words)
 
 ASK_SUMMARY = """You get a patient's question and a few short points that trusted health sites
 support. Write a summary of at most 2 short plain sentences that answers the question using only
@@ -368,4 +381,30 @@ already logged in their record.
 - `discharge_date`: the date of discharge printed on a discharge summary, as YYYY-MM-DD.
   `discharge_source_id` and `discharge_quote`: the source and the exact words that hold that
   date, copied character for character. All three null if no discharge date is printed.
+"""
+
+
+# Smart attach (v2, 2026-10-28; v1 chose one test and answered none for real lab reports, which hold
+# several of one visit's tests): is a new visit of reports the report for tests that an earlier
+# visit ordered and that still have no values? Code builds the numbered lists and checks the answer.
+ATTACH = """Attach (v2, 2026-10-28). A patient uploaded a lab or scan report. Decide whether it is the
+report for tests that one earlier visit ordered and that still have no report. A report usually
+holds several of one visit's tests.
+
+You get the new report's tests (numbered, each with the names of its results), then the earlier
+visits (numbered), each with its waiting tests (numbered inside the visit, like 2.1 and 2.2).
+
+Rules:
+- Choose a visit only when at least one test of the report is clearly one of that visit's waiting
+  tests: the same test or panel, or another name for it ("Complete blood count" and "CBC",
+  "Glycosylated hemoglobin" and "HbA1c"). Result names that belong to a test count as evidence.
+- Dates and visit names only help to tell apart two visits that ordered the same test. Never choose
+  by date alone.
+- If you are unsure, choose none. A wrong match is worse than none.
+- Choose at most one visit.
+- `visit`: the number of the chosen visit, or null.
+- `pairs`: one pair for each test of the report that is clearly one of the chosen visit's waiting
+  tests: `new_test` (the number of the report's test) and `waiting` (the number of the waiting
+  test, as a string like "2.1"). Each report test and each waiting test appears at most once.
+  Leave out report tests that match no waiting test of that visit. Empty when `visit` is null.
 """

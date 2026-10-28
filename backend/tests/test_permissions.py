@@ -42,6 +42,8 @@ def _routes(enc_id: str, entry_id: str) -> list[tuple[str, str, dict]]:
         ("patch", f"/encounters/{enc_id}", {"json": {"visit_date": "2026-01-01"}}),
         ("patch", f"/encounters/{enc_id}", {"json": {"title": "Fever and cough"}}),
         ("get", f"/encounters/{enc_id}/removal", {}),
+        ("post", f"/encounters/{enc_id}/attach", {"json": {"encounter_id": "some-visit", "test_entry_ids": ["some-test"]}}),
+        ("delete", f"/encounters/{enc_id}/attach", {}),
         ("delete", f"/encounters/{enc_id}", {}),
         ("post", f"/encounters/{enc_id}/reread",
          {"files": [("files", ("a.jpg", b"x", "image/jpeg"))], "data": {"source_ids": ["s"]}}),

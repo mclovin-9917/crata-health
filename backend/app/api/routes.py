@@ -31,6 +31,7 @@ from app.config import get_settings
 from app.media import pdf
 from app.medicine_info import medicine_info, prewarm
 from app.parameters import is_known, measure_of
+from app.pipeline import attach
 from app.pipeline.crosscheck import for_review
 from app.pipeline.medicines import from_table, has_hindi, translate_confirmed
 from app.pipeline.review import flagged
@@ -57,7 +58,7 @@ from app.schemas.record import (
     Tier,
     VisitDateSource,
 )
-from app.storage import Storage
+from app.storage import Changed, Storage
 from app.views import (
     EmergencySummary,
     Numbers,
@@ -309,6 +310,11 @@ class EncounterView(Encounter):
         description="Entry id -> why it needs a look of its own (check, clash, unsure): shown "
         "open on Review and never covered by Confirm all",
     )
+    attach_to: attach.AttachTarget | None = Field(
+        default=None,
+        description="Smart attach: the earlier visit and test this visit of reports may belong "
+        "to, when the stored suggestion still holds",
+    )
 
 
 def _findings(db: Storage, enc: Encounter, elsewhere: list[Entry]) -> list[Discrepancy]:
@@ -333,7 +339,7 @@ def get_encounter(encounter_id: str, db: DB, me: Me) -> EncounterView:
     enc.discrepancies = _findings(db, enc, elsewhere)
     return EncounterView(
         **enc.model_dump(), already_in_record=already_in_record(proposed, elsewhere),
-        flagged=flagged(enc.entries, enc.discrepancies),
+        flagged=flagged(enc.entries, enc.discrepancies), attach_to=attach.target_view(db, enc),
     )
 
 
@@ -369,6 +375,54 @@ def update_encounter(encounter_id: str, body: VisitUpdate, db: DB, me: Me) -> En
         enc.title, enc.title_source = title, "patient"
     db.save_encounter(enc)
     return db.get_encounter(encounter_id)
+
+
+class AttachBody(BaseModel):
+    # What the patient was shown: a suggestion that changed since answers 409.
+    encounter_id: str
+    test_entry_ids: list[str] = Field(min_length=1, max_length=50)
+
+
+class Attached(BaseModel):
+    encounter_id: str = Field(description="The earlier visit the report now belongs to")
+
+
+@router.post("/encounters/{encounter_id}/attach")
+def attach_to_visit(encounter_id: str, body: AttachBody, db: DB, me: Me) -> Attached:
+    """Smart attach: the patient accepts the suggestion that this visit of reports is the report
+    for tests of an earlier visit. Its values (and anything else it holds) move to that visit and
+    are linked to those tests, the files' records move with them, the visit's own copies of the
+    paired tests are dropped and the now empty visit is erased. Every pair is checked again first;
+    the change is one transaction, and it is refused if either visit changed since it was loaded."""
+    enc = _encounter(db, me, encounter_id)
+    if enc.status == EncounterStatus.PROCESSING:
+        raise HTTPException(409, "This visit is being read. Try again in a minute.")
+    found = attach.target_of(db, enc)
+    suggestion = enc.attach_suggestion
+    if (found is None or suggestion is None or suggestion.encounter_id != body.encounter_id
+            or sorted(p.waiting_test_id for p in suggestion.pairs) != sorted(body.test_entry_ids)):
+        raise HTTPException(409, "This suggestion no longer applies.")
+    target, pairs = found
+    before = [target.model_copy(deep=True), enc.model_copy(deep=True)]  # as loaded, before moving
+    if not attach.merge(enc, target, pairs):
+        raise HTTPException(409, "There is nothing in this visit to add to those tests.")
+    try:
+        db.merge_encounter(target, enc.id, expect=before)
+    except Changed as exc:
+        raise HTTPException(409, "A visit changed while this was happening. Nothing was moved. "
+                                 "Try again.") from exc
+    return Attached(encounter_id=target.id)
+
+
+@router.delete("/encounters/{encounter_id}/attach", status_code=204)
+def keep_as_own_visit(encounter_id: str, db: DB, me: Me) -> None:
+    """The patient keeps the visit as its own: the suggestion is cleared."""
+    enc = _encounter(db, me, encounter_id)
+    if enc.status == EncounterStatus.PROCESSING:
+        raise HTTPException(409, "This visit is being read. Try again in a minute.")
+    if enc.attach_suggestion is not None:
+        enc.attach_suggestion = None
+        db.save_encounter(enc)
 
 
 @router.get("/encounters/{encounter_id}/removal")

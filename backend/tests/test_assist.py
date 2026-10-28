@@ -14,6 +14,7 @@ from app.assist import (
     ASKS_PER_DAY,
     DOSE,
     HEALTH_DOMAINS,
+    RECORD_NONE_NOTE,
     SPECIALTIES,
     _Answer,
     _AskPoint,
@@ -34,6 +35,7 @@ from app.main import create_app
 from app.schemas.assist import PrepRecord
 from app.schemas.patient import Patient
 from app.schemas.record import (
+    Encounter,
     Entry,
     EntryKind,
     EntryStatus,
@@ -414,7 +416,7 @@ def test_ask_keeps_only_points_the_source_backs():
     body = r.json()
     assert set(body) == {"urgent", "warning_signs", "health_question", "points", "sources",
                          "allergy_notes", "considered", "note", "models_used", "helpline",
-                         "kind", "record_items", "record_summary", "summary"}
+                         "kind", "record_items", "record_summary", "summary", "charts"}
     assert body["kind"] == "general" and body["record_items"] == []
     assert body["record_summary"] is None and body["summary"] == "Rice raises blood sugar."
     assert [p["text"] for p in body["points"]] == [
@@ -889,7 +891,10 @@ def test_a_record_question_uses_the_record_only_and_never_searches():
     assert search.queries == [] and ai.calls == ["_Plan", "_RecordAnswer"]
     # r1 is the current medicine; the invented id and the repeat are dropped.
     assert body["record_items"] == [{"id": "r1", "kind": "medicine", "label": "Metformin 500 mg",
-                                     "detail": ""}]
+                                     "detail": "", "link": "/record",
+                                     "link_label": "Open My record", "numbers_link": "",
+                                     "group_key": ""}]
+    assert body["charts"] == []  # a medicine brings no chart
     assert body["record_summary"] == "You take metformin for diabetes."
     assert body["points"] == [] and body["sources"] == [] and body["summary"] is None
     assert body["models_used"] == ["nvidia:super"]  # no tavily
@@ -909,7 +914,8 @@ def test_record_items_come_from_confirmed_entries_with_dose_and_frequency():
     db.save_entry(proposed)  # not confirmed
     items = _ask(client, "what do I take?").json()["record_items"]
     assert {"id": "r2", "kind": "medicine", "label": "Amlodipine",
-            "detail": "5 mg, once a day"} in items
+            "detail": "5 mg, once a day", "link": "/record", "link_label": "Open My record",
+            "numbers_link": "", "group_key": ""} in items
     assert all("Secret" not in i["label"] for i in items)
     assert {i["kind"] for i in items} <= {"medicine", "allergy", "condition", "event", "test"}
 
@@ -921,7 +927,8 @@ def test_record_question_with_an_empty_record_makes_no_record_model_call():
     client = api_client(create_app(db, ai, FakeSearch()), person=PID)
     body = _ask(client, "what tablets do I take?").json()
     assert body["record_items"] == [] and body["record_summary"] is None
-    assert "doesn't show anything" in body["note"] and ai.calls == ["_Plan"]
+    assert body["note"] == RECORD_NONE_NOTE and body["charts"] == [] and ai.calls == ["_Plan"]
+    assert body["note"].startswith("This hasn't been added to your record yet.")
 
 
 @pytest.mark.parametrize("summary", ["Please stop taking metformin.", "Take 500 mg daily.",
@@ -935,7 +942,7 @@ def test_a_record_summary_with_a_directive_or_dose_is_dropped(summary):
 
 def test_a_both_question_gives_record_items_and_points():
     _, ai, search, client = _world(plan=_plan(kind="both"))
-    body = _ask(client, "can I eat rice with my tablets?").json()
+    body = _ask(client, "can I eat rice with my tablets for diabetes?").json()
     assert body["kind"] == "both"
     assert [i["id"] for i in body["record_items"]] == ["r1"]
     assert body["record_summary"] == "You take one medicine."
@@ -949,7 +956,7 @@ def test_a_both_question_gives_record_items_and_points():
 
 def test_a_both_question_with_unsafe_search_words_still_gives_the_record_part():
     _, _, search, client = _world(plan=_plan(words="asha rice", kind="both"))
-    body = _ask(client, "can I eat rice with my tablets?").json()
+    body = _ask(client, "can I eat rice with my tablets for diabetes?").json()
     assert search.queries == [] and body["record_items"] and body["points"] == []
 
 
@@ -1047,6 +1054,7 @@ def test_a_record_answer_with_no_kept_ids_has_no_summary():
     _, _, _, client = _world(plan=_plan(words="", kind="record"), record=rec)
     body = _ask(client, "what do I take?").json()
     assert body["record_items"] == [] and body["record_summary"] is None
+    assert body["charts"] == [] and body["note"] == RECORD_NONE_NOTE
 
 
 _LONG = "Rice has fibre. " + "It is a grain that people eat in many places. " * 8
@@ -1070,7 +1078,7 @@ def test_ai_summaries_must_be_short_and_free_of_advice(text):
     _, _, _, client = _world(summary=_Summary(summary=text),
                              plan=_plan(kind="both"),
                              record=_RecordAnswer(item_ids=["r1"], summary=text))
-    body = _ask(client, "can I eat rice with my tablets?").json()
+    body = _ask(client, "can I eat rice with my tablets for diabetes?").json()
     assert body["summary"] is None and body["record_summary"] is None
     assert len(body["points"]) == 3 and len(body["record_items"]) == 1
 
@@ -1078,7 +1086,7 @@ def test_ai_summaries_must_be_short_and_free_of_advice(text):
 def test_two_short_sentences_pass():
     ok = "Rice raises blood sugar. Brown rice has more fibre."
     _, _, _, client = _world(summary=_Summary(summary=ok), plan=_plan(kind="both"))
-    assert _ask(client, "can I eat rice with my tablets?").json()["summary"] == ok
+    assert _ask(client, "can I eat rice with my tablets for diabetes?").json()["summary"] == ok
 
 
 def test_follow_up_questions_and_choices_get_the_wider_filter_and_length_caps():
@@ -1097,11 +1105,11 @@ def test_both_with_no_general_points_uses_the_record_note():
     from app.assist import RECORD_NOTE
     # Unsafe search words.
     _, _, _, client = _world(plan=_plan(words="asha rice", kind="both"))
-    assert _ask(client, "can I eat rice with my tablets?").json()["note"] == RECORD_NOTE
+    assert _ask(client, "can I eat rice with my tablets for diabetes?").json()["note"] == RECORD_NOTE
     # Every point filtered out.
     _, _, _, client = _world(plan=_plan(kind="both"),
                              answer=_Answer(points=[_pt("Not in source.", 1, "nope nope")]))
-    assert _ask(client, "can I eat rice with my tablets?").json()["note"] == RECORD_NOTE
+    assert _ask(client, "can I eat rice with my tablets for diabetes?").json()["note"] == RECORD_NOTE
 
 
 def test_rejected_and_proposed_entries_stay_out_of_the_record_items():
@@ -1115,3 +1123,307 @@ def test_rejected_and_proposed_entries_stay_out_of_the_record_items():
     labels = [i.label for i in record_items_for(entries, db.list_encounters(PID))]
     assert "Metformin 500 mg" in labels
     assert "Rejected condition" not in labels and "Proposed allergy" not in labels
+
+
+# ---- Ask: links to the source, charts for number questions, no repeats -------------------------
+def _confirmed(db, **kw):
+    e = Entry(patient_id=kw.pop("patient_id", PID), **kw)
+    e.set_status(EntryStatus.CONFIRMED, by="system")
+    db.save_entry(e)
+    return e
+
+
+def _visit(db):
+    enc = Encounter(patient_id=PID, visit_date=TODAY)
+    db.save_encounter(enc)
+    return enc
+
+
+def _reading(db, label, value, days_ago, unit="%", enc=None, test=None, **rng):
+    return _confirmed(
+        db, kind=EntryKind.RESULT, label=label, encounter_id=enc.id if enc else None,
+        links=[test.id] if test else [],
+        result=TestResult(value=value, unit=unit, measured_on=TODAY - timedelta(days=days_ago),
+                          **rng))
+
+
+def _items_by_label(db):
+    from app.assist import record_items_for
+    return {i.label: i for i in record_items_for(db.list_entries(PID), db.list_encounters(PID))}
+
+
+def test_record_items_link_to_the_visit_the_report_or_my_record():
+    db, _, _, _ = _world()  # Metformin, the allergy, HbA1c: none of them has a visit
+    enc = _visit(db)
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Amlodipine", encounter_id=enc.id,
+               medication=Medication(ongoing=True))
+    _confirmed(db, kind=EntryKind.DIAGNOSIS, label="Hypertension", encounter_id=enc.id)
+    _confirmed(db, kind=EntryKind.SURGERY, label="Hernia repair", encounter_id=enc.id,
+               occurred_on=str(TODAY.year))
+    test = _confirmed(db, kind=EntryKind.TEST, label="Lipid profile", encounter_id=enc.id)
+    _reading(db, "LDL cholesterol", 130, 3, "mg/dL", enc, test, ref_high=100)
+    _reading(db, "Blood sugar (fasting)", 99, 2, "mg/dL", enc)  # a value with no report entry
+    _reading(db, "Weight", 62.5, 1, "kg")  # typed by the patient: no visit, no report
+    items = _items_by_label(db)
+    assert (items["Amlodipine"].link, items["Amlodipine"].link_label) == (
+        f"/encounters/{enc.id}", "Open visit")
+    assert items["Hypertension"].link == f"/encounters/{enc.id}"
+    assert items["Hernia repair"].link == f"/encounters/{enc.id}"
+    assert (items["Metformin 500 mg"].link, items["Metformin 500 mg"].link_label) == (
+        "/record", "Open My record")
+    assert items["Peanut allergy"].link == "/record"
+    ldl = items["LDL cholesterol"]
+    assert (ldl.link, ldl.link_label) == (f"/reports/{test.id}", "See report")
+    assert ldl.numbers_link == f"/numbers/{ldl.group_key}" and ldl.group_key
+    assert items["Blood sugar (fasting)"].link == f"/encounters/{enc.id}"  # no report: the visit
+    weight = items["Weight"]
+    assert weight.link == "" and weight.numbers_link.startswith("/numbers/")
+    assert items["HbA1c"].link == "" and items["HbA1c"].numbers_link.startswith("/numbers/")
+
+
+def test_a_group_key_with_a_colon_or_slash_is_encoded_in_the_numbers_link():
+    from app.assist import _numbers_link
+    assert _numbers_link("hba1c:%") == "/numbers/hba1c%3A%25"
+    assert _numbers_link("tsh:uiu/ml") == "/numbers/tsh%3Auiu%2Fml"
+
+
+def test_a_number_question_returns_the_whole_series_of_the_picked_test_only():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    enc = _visit(db)
+    test = _confirmed(db, kind=EntryKind.TEST, label="HbA1c report", encounter_id=enc.id)
+    _reading(db, "HbA1c", 7.1, 200, "%", enc, test, ref_high=5.6)
+    _reading(db, "HbA1c", 7.9, 100, "%", enc, test, ref_high=5.6)
+    gone = _reading(db, "HbA1c", 9.9, 50, "%", enc, test, ref_high=5.6)
+    gone.set_status(EntryStatus.REJECTED, by="patient")
+    db.save_entry(gone)  # the patient removed it: not drawn
+    _reading(db, "LDL cholesterol", 130, 3, "mg/dL")
+    items = _items_by_label(db)
+    ai.record = _RecordAnswer(item_ids=[items["HbA1c"].id], summary="It has gone up.")
+    body = _ask(client, "how has my sugar been?").json()
+    assert [c["name"] for c in body["charts"]] == ["HbA1c"]  # the LDL was not picked
+    chart = body["charts"][0]
+    (series,) = chart["series"]
+    assert [p["value"] for p in series["points"]] == [7.1, 7.9, 8.2]  # oldest first, all dates
+    assert all(p["on"] and p["unit"] == "%" and p["range"]["high"] == 5.6
+               for p in series["points"][:2])
+    assert chart["numbers_link"] == items["HbA1c"].numbers_link
+    assert chart["report_link"] == ""  # the newest reading (today's) was typed in, no report
+    assert "history" not in body["record_items"][0]
+    # The model saw how many readings there are, so its summary can say "up" in words.
+    assert "history: 3 readings since" in ai.users[1]
+
+
+def test_the_chart_links_to_the_newest_readings_report():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    enc = _visit(db)
+    test = _confirmed(db, kind=EntryKind.TEST, label="Sugar report", encounter_id=enc.id)
+    _reading(db, "Blood sugar (fasting)", 120, 10, "mg/dL", enc, test)
+    _reading(db, "Blood sugar (fasting)", 104, 1, "mg/dL", enc, test)
+    items = _items_by_label(db)
+    ai.record = _RecordAnswer(item_ids=[items["Blood sugar (fasting)"].id])
+    chart = _ask(client, "how is my fasting sugar?").json()["charts"][0]
+    assert chart["report_link"] == f"/reports/{test.id}"
+
+
+def test_no_picked_test_means_no_chart_and_a_chart_set_is_capped_at_three():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    for label in ("LDL cholesterol", "Blood sugar (fasting)", "TSH", "Haemoglobin"):
+        _reading(db, label, 5, 30, "x")
+        _reading(db, label, 6, 3, "x")
+    items = _items_by_label(db)
+    ai.record = _RecordAnswer(item_ids=[items["Peanut allergy"].id, items["Metformin 500 mg"].id])
+    assert _ask(client, "what do I have?").json()["charts"] == []
+    picked = [i.id for i in items.values() if i.kind == "test"]
+    assert len(picked) == 5  # the four above and HbA1c
+    ai.record = _RecordAnswer(item_ids=picked)
+    assert len(_ask(client, "show my tests").json()["charts"]) == 3
+
+
+def test_measures_that_share_a_card_come_as_one_chart():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    _reading(db, "Blood pressure (systolic)", 150, 20, "mmHg")
+    _reading(db, "Blood pressure (diastolic)", 95, 20, "mmHg")
+    _reading(db, "Blood pressure (systolic)", 138, 2, "mmHg")
+    _reading(db, "Blood pressure (diastolic)", 88, 2, "mmHg")
+    items = _items_by_label(db)
+    bp = [i.id for i in items.values() if "Blood pressure" in i.label]
+    assert len(bp) == 2
+    ai.record = _RecordAnswer(item_ids=[bp[0]])  # only one line picked: the card comes whole
+    charts = _ask(client, "how is my blood pressure?").json()["charts"]
+    assert len(charts) == 1 and len(charts[0]["series"]) == 2
+
+
+def test_another_patients_numbers_never_appear_in_an_answer():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    db.save_patient(Patient(id="p-other", name="Other Person (synthetic)"))
+    _confirmed(db, patient_id="p-other", kind=EntryKind.RESULT, label="HbA1c", result=TestResult(
+        value=12.4, unit="%", measured_on=TODAY))
+    _confirmed(db, patient_id="p-other", kind=EntryKind.MEDICATION, label="Insulin",
+               medication=Medication(ongoing=True))
+    items = _items_by_label(db)
+    ai.record = _RecordAnswer(item_ids=[items["HbA1c"].id])
+    text = _ask(client, "how is my sugar?").text
+    assert "12.4" not in text and "Insulin" not in text and "8.2" in text
+
+
+def test_the_detail_line_drops_what_the_label_already_says():
+    db, _, _, _ = _world()
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Amlodipine 5 mg",
+               medication=Medication(dose="5 mg", doses_per_day=1, ongoing=True))
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Telmisartan 40mg",
+               medication=Medication(dose="40 mg", doses_per_day=2, ongoing=True))
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Atorvastatin",
+               medication=Medication(dose="10 mg", doses_per_day=1, ongoing=True))
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Vitamin D 60000 IU",
+               medication=Medication(dose="60000 IU", ongoing=True))
+    items = _items_by_label(db)
+    assert items["Amlodipine 5 mg"].detail == "once a day"
+    assert items["Telmisartan 40mg"].detail == "twice a day"  # "40 mg" is "40mg" in the label
+    assert items["Atorvastatin"].detail == "10 mg, once a day"  # the label does not say it
+    assert items["Vitamin D 60000 IU"].detail == ""  # nothing left to say
+
+
+def test_a_record_summary_may_use_numbers_from_the_history_but_no_others():
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    _reading(db, "HbA1c", 7.1, 200, "%")
+    _reading(db, "HbA1c", 7.9, 100, "%")
+    items = _items_by_label(db)
+    ai.record = _RecordAnswer(item_ids=[items["HbA1c"].id],
+                              summary="It was 7.1 at first and is now 8.2, above its printed range.")
+    assert _ask(client, "how is my sugar?").json()["record_summary"].startswith("It was 7.1")
+    ai.record = _RecordAnswer(item_ids=[items["HbA1c"].id], summary="It was 6.0 at first.")
+    assert _ask(client, "how is my sugar?").json()["record_summary"] is None
+
+
+def test_the_record_prompt_is_v3_and_asks_for_more_than_a_reading_back():
+    from app.pipeline import prompts
+    assert "ASK_RECORD v3 (2026-10-28" in Path(prompts.__file__).read_text(encoding="utf-8")
+    assert "do not read them back" in prompts.ASK_RECORD
+    assert "every test" in prompts.ASK_RECORD
+    assert '"printed range", never the "normal' in prompts.ASK_RECORD
+
+
+def _sugar_world():
+    """Fasting sugar 118 -> 108 (lower, above its printed range); HbA1c 6.1 -> 6.4 (higher)."""
+    db, ai, _, client = _world(plan=_plan(words="", kind="record"))
+    _reading(db, "Blood sugar (fasting)", 118, 100, "mg/dL", ref_high=100)
+    _reading(db, "Blood sugar (fasting)", 108, 10, "mg/dL", ref_high=100)
+    _reading(db, "Thyroid test TSH", 2.0, 100, "uIU/mL", ref_high=4.0)
+    _reading(db, "Thyroid test TSH", 2.5, 10, "uIU/mL", ref_high=4.0)
+    items = _items_by_label(db)
+    return db, ai, client, items
+
+
+def test_code_works_out_direction_and_range_position_and_tells_the_model():
+    _, ai, client, items = _sugar_world()
+    fasting = items["Blood sugar (fasting)"]
+    assert (fasting.direction, fasting.position) == ("lower", "above")
+    assert "the latest is lower than the one before" in fasting.history
+    assert "the latest is above the printed range" in fasting.history
+    tsh = items["TSH"]
+    assert (tsh.direction, tsh.position) == ("higher", "within")
+    # A single reading has a range position but no direction.
+    assert (items["HbA1c"].direction, items["HbA1c"].position) == ("", "above")
+    ai.record = _RecordAnswer(item_ids=[fasting.id])
+    _ask(client, "how is my sugar?")
+    assert "the latest is lower than the one before" in ai.users[1]
+
+
+@pytest.mark.parametrize("summary, ok", [
+    ("Your fasting blood sugar is lower than before and above its printed range.", True),
+    ("Your fasting blood sugar is higher than before.", False),  # code says lower
+    ("Your fasting blood sugar is below its printed range.", False),  # code says above
+    ("Your TSH is higher than before and within its printed range.", True),
+    ("Your TSH is higher than before but above its printed range.", False),
+    ("Fasting blood sugar is lower, but TSH is higher.", True),
+    ("Fasting blood sugar is higher, but TSH is lower.", False),  # swapped
+    ("Fasting blood sugar is lower and TSH is higher, and both are above their ranges.", True),
+    ("Your HbA1c is higher than before.", False),  # one reading: no direction to speak of
+    ("Your HbA1c is above its printed range.", True),
+    ("You have 3 test values listed.", False),  # 3 is in no item: the number check
+    ("You have two tests listed.", True),
+])
+def test_a_direction_or_range_word_must_match_the_codes_word_for_that_measure(summary, ok):
+    _, ai, client, items = _sugar_world()
+    ids = [items[k].id for k in ("Blood sugar (fasting)", "TSH", "HbA1c")]
+    ai.record = _RecordAnswer(item_ids=ids, summary=summary)
+    got = _ask(client, "how are my tests?").json()["record_summary"]
+    assert (got == summary) is ok
+
+
+@pytest.mark.parametrize("word", ["better", "worse", "Good", "bad", "improved", "improving",
+                                  "worsened", "normal", "abnormal", "controlled", "Uncontrolled",
+                                  "healthy", "concerning"])
+def test_a_record_summary_never_judges(word):
+    _, ai, client, items = _sugar_world()
+    ai.record = _RecordAnswer(item_ids=[items["Peanut allergy"].id],
+                              summary=f"It is {word} here.")
+    assert _ask(client, "what allergies?").json()["record_summary"] is None
+    ai.record = _RecordAnswer(item_ids=[items["Peanut allergy"].id],
+                              summary="You have one allergy listed.")
+    assert _ask(client, "what allergies?").json()["record_summary"] is not None
+
+
+def test_normal_range_wording_is_dropped_but_printed_range_stays():
+    _, ai, client, items = _sugar_world()
+    fasting = items["Blood sugar (fasting)"].id
+    ai.record = _RecordAnswer(item_ids=[fasting], summary="Fasting blood sugar is above its normal range.")
+    assert _ask(client, "sugar?").json()["record_summary"] is None
+    ai.record = _RecordAnswer(item_ids=[fasting], summary="Fasting blood sugar is above its printed range.")
+    assert _ask(client, "sugar?").json()["record_summary"] is not None
+
+
+def test_a_search_word_from_the_record_needs_to_be_in_the_question():
+    # The model must not carry a medicine or a condition of the record into a search on its own.
+    labels = ["Metformin 500 mg", "Type 2 diabetes", "Hypertension"]
+    ok = check_search_words
+    assert not ok("diabetes rice", "Asha", labels, "can I eat rice with my tablets?")
+    assert not ok("metformin food", "Asha", labels, "what can I eat?")
+    assert not ok("Hypertension salt", "Asha", labels, "is salt bad?")
+    assert ok("diabetes rice", "Asha", labels, "Can I eat rice with Diabetes?")  # typed by them
+    assert ok("rice breakfast", "Asha", labels, "can I eat rice?")
+    assert ok("diabetes rice", "Asha")  # no record given: as before
+
+
+def test_ask_does_not_search_with_a_condition_the_patient_did_not_type():
+    _, _, search, client = _world(plan=_plan(words="diabetes rice", kind="both"))
+    body = _ask(client, "can I eat rice with my tablets?").json()
+    assert search.queries == [] and body["points"] == []
+    _, _, search, client = _world(plan=_plan(words="diabetes rice", kind="both"))
+    _ask(client, "can I eat rice with my diabetes?")
+    assert len(search.queries) == 1
+
+
+def test_a_follow_up_may_search_with_a_condition_typed_in_the_question_it_follows():
+    _, _, search, client = _world(plan=_plan(words="diabetes mango", kind="general"))
+    prev = {"question": "Can I eat rice with diabetes?", "points": ["Rice raises blood sugar."]}
+    r = client.post(f"/patients/{PID}/ask", json={"question": "what about mango?",
+                                                  "previous": prev})
+    assert r.status_code == 200 and len(search.queries) == 1
+    _, _, search, client = _world(plan=_plan(words="diabetes mango", kind="general"))
+    client.post(f"/patients/{PID}/ask", json={"question": "what about mango?"})
+    assert search.queries == []  # nothing typed named it
+
+
+def test_a_dose_is_only_dropped_from_the_detail_when_the_whole_token_is_in_the_label():
+    db, _, _, _ = _world()
+    _confirmed(db, kind=EntryKind.MEDICATION, label="Thyroxine 125mcg",
+               medication=Medication(dose="25mcg", doses_per_day=1, ongoing=True))
+    assert _items_by_label(db)["Thyroxine 125mcg"].detail == "25mcg, once a day"
+
+
+def test_a_report_link_skips_a_proposed_test():
+    from app.assist import _Links
+    db, _, _, _ = _world()
+    proposed = Entry(patient_id=PID, kind=EntryKind.TEST, label="Proposed panel")
+    db.save_entry(proposed)
+    shown = _confirmed(db, kind=EntryKind.TEST, label="Shown panel")
+    value = _reading(db, "Creatinine", 0.9, 1, "mg/dL")
+    value.links = [proposed.id]
+    db.save_entry(value)
+    links = _Links(db.list_entries(PID), db.list_encounters(PID))
+    assert links.report(value.id) == ""
+    value.links = [proposed.id, shown.id]
+    db.save_entry(value)
+    links = _Links(db.list_entries(PID), db.list_encounters(PID))
+    assert links.report(value.id) == f"/reports/{shown.id}"

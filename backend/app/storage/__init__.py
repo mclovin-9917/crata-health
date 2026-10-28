@@ -1,3 +1,3 @@
-from app.storage.sqlite import Storage
+from app.storage.sqlite import Changed, Storage
 
-__all__ = ["Storage"]
+__all__ = ["Changed", "Storage"]

@@ -59,15 +59,15 @@ export default function App() {
     );
   }, [me]);
 
+  // Nobody signed in: nothing of Ask's thread stays in this tab (sign-out, an ended session, a
+  // session that ends on another tab).
+  useEffect(() => {
+    if (me === null) clearAskStorage();
+  }, [me]);
+
   const signOut = () => {
     api.auth.logout().finally(() => {
-      try {
-        for (const k of Object.keys(sessionStorage)) {
-          if (k.startsWith("crata.askAnswers.")) sessionStorage.removeItem(k);
-        }
-      } catch {
-        // storage blocked: nothing to clear
-      }
+      clearAskStorage();
       setMe(null);
       go("/");
     });
@@ -166,6 +166,26 @@ function Shell({ account, children }: { account?: AccountState; children: ReactN
   );
 }
 
+/** Ask about my health keeps its conversation in this tab (`crata.askThread.<person>`; the older
+ * `crata.askAnswers.<person>` too): both go when the session ends. */
+function clearAskStorage() {
+  try {
+    for (const k of Object.keys(sessionStorage)) {
+      if (k.startsWith("crata.askAnswers.") || k.startsWith("crata.askThread.")) sessionStorage.removeItem(k);
+    }
+  } catch {
+    // storage blocked: nothing to clear
+  }
+}
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 function Screen({ route, admin }: { route: string[]; admin: boolean }) {
   switch (route[0]) {
     case "add":
@@ -175,7 +195,7 @@ function Screen({ route, admin }: { route: string[]; admin: boolean }) {
     case "record":
       return <RecordScreen />;
     case "numbers":
-      return <NumbersScreen />;
+      return <NumbersScreen openKey={route[1] ? safeDecode(route[1]) : undefined} />;
     case "reports":
       return <ReportScreen testId={route[1]} />;
     case "emergency":

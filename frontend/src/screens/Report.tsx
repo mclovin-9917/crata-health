@@ -33,6 +33,8 @@ export default function ReportScreen({ testId }: { testId: string }) {
   // A date column when the values of one report carry different dates.
   const dates = new Set(values.map((v) => v.result?.measured_on?.slice(0, 10) ?? ""));
   const dateColumn = dates.size > 1;
+  // A scan report (CT, MRI, X-ray, ultrasound): every value is a line of words, so no table.
+  const inWords = values.length > 0 && values.every((v) => v.result?.value === null);
   const headers = ["Measure", "Result", "Unit", "Printed range", ...(dateColumn ? ["Date"] : []), "Compared with range"];
 
   return (
@@ -58,6 +60,32 @@ export default function ReportScreen({ testId }: { testId: string }) {
       <div className="card">
         {values.length === 0 ? (
           <p className="text-sm text-ink-600">No results in this report yet.</p>
+        ) : inWords ? (
+          <section aria-labelledby="report-findings">
+            <h2 id="report-findings" className="text-xs font-bold tracking-wider text-ink-600 uppercase">Findings</h2>
+            <ol role="list" className="mt-2 divide-y divide-ink-100 text-sm text-ink-900">
+              {values.map((v) => {
+                const r = v.result!;
+                const text = r.value_text ?? v.label;
+                const range = rangeText(r);
+                // Scan lines already start with their key words; lab words ("Non-reactive") need the name.
+                const strip = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").toLowerCase();
+                const startsWithLabel = !!v.label && strip(text).startsWith(strip(v.label));
+                return (
+                  <li key={v.id} className="py-2 first:pt-0 last:pb-0">
+                    {startsWithLabel ? text : (
+                      <>
+                        <span className="font-semibold">{v.label}</span>: {text}
+                      </>
+                    )}
+                    {range && <span className="ml-2 text-xs text-ink-500">printed range: {range}</span>}
+                    {dateColumn && r.measured_on && <span className="ml-2 text-xs text-ink-500">{formatDate(r.measured_on)}</span>}
+                    {editedByPatient(v) && <span className="ml-2 text-xs font-normal text-amber-700">Edited by you</span>}
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
         ) : (
           <table className="block w-full text-left text-sm sm:table" role="table" aria-label={`${test.label}, results`}>
             <thead className="sr-only sm:table-header-group sm:not-sr-only" role="rowgroup">
@@ -102,8 +130,9 @@ export default function ReportScreen({ testId }: { testId: string }) {
         )}
       </div>
       <p className="text-xs text-ink-500">
-        Above or below means outside the range printed on the report. Ranges differ between labs. Ask your doctor
-        what a number means for you.
+        {inWords
+          ? "Read from the report as printed. Ask your doctor what these findings mean for you."
+          : "Above or below means outside the range printed on the report. Ranges differ between labs. Ask your doctor what a number means for you."}
       </p>
     </div>
   );

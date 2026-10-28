@@ -408,6 +408,12 @@ class SourceItem(BaseModel):
         description="Documents added with 'Add report': the test entry they are the report for. "
         "A careful re-read treats them the same way (values only, the visit's date untouched).",
     )
+    attached_to: str | None = Field(
+        default=None,
+        description="Documents moved here by smart attach: the test entry (of this visit) their values "
+        "were filed under first. A careful re-read replaces only their values; their other entries, "
+        "the visit's date and its name are left alone.",
+    )
 
 
 class EncounterStatus(str, Enum):
@@ -441,6 +447,21 @@ class HospitalStay(BaseModel):
     @property
     def open(self) -> bool:
         return self.ended_on is None
+
+
+class AttachPair(BaseModel):
+    """One test of the new report and the waiting test of the earlier visit it is the report for."""
+
+    new_test_id: str = Field(description="A test entry of the new visit (dropped on attach)")
+    waiting_test_id: str = Field(description="The test entry of the earlier visit that gets its values")
+
+
+class AttachSuggestion(BaseModel):
+    """The AI's idea that a visit of reports is the report for tests waiting on an earlier visit.
+    Code offered the candidates and checks the answer; the patient adds it there or keeps it."""
+
+    encounter_id: str = Field(description="The earlier visit that ordered the tests")
+    pairs: list[AttachPair] = Field(default_factory=list)
 
 
 class Encounter(BaseModel):
@@ -482,6 +503,10 @@ class Encounter(BaseModel):
     quote_failures: list[str] = Field(
         default_factory=list, description="Labels of model proposals dropped: quote not in source"
     )
+    # A new visit made of reports only may be the report for a test waiting on an earlier visit
+    # (smart attach, 2026-10-28). Only a suggestion: the patient decides. Rows saved before this
+    # existed load without it.
+    attach_suggestion: AttachSuggestion | None = None
 
 
 def emergency_entries(entries: list[Entry], today: date | None = None) -> list[Entry]:

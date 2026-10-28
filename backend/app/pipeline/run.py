@@ -23,7 +23,7 @@ from app.ai.search import WebSearch
 from app.config import get_settings
 from app.media import audio as audio_prep
 from app.media import pdf
-from app.pipeline import prompts
+from app.pipeline import attach, prompts
 from app.pipeline.bills import (
     apply_kinds,
     bill_date,
@@ -51,6 +51,7 @@ from app.pipeline.quotes import quote_in_source
 from app.pipeline.results import to_results
 from app.pipeline.review import read_as_is
 from app.schemas.record import (
+    AttachSuggestion,
     BillLine,
     Discrepancy,
     Encounter,
@@ -168,15 +169,28 @@ def _reread(db: Storage, ai: AIClient, enc: Encounter, media: list[Media],
         return (src.reread_of or src.id) if src else source_id
 
     reread: set[str] = set()  # the files being read again, by their first source
+    attached: set[str] = set()  # of those, the files smart attach moved here (see below)
     groups: dict[str | None, list[Media]] = {}  # reports added to a test are read as reports
+    live = [t.id for t in _tests(enc.entries)]
     for m in media:
         old = next(s for s in enc.sources if s.id == m.source_id)
+        # A file smart attach moved here is read like a report added to a test: its values only,
+        # filed under the visit's tests, the visit's date and name untouched. The test it was
+        # filed under first, else any test of the visit; with none, the file is left as it was.
+        key = old.report_for
+        if key is None and old.attached_to:
+            key = old.attached_to if old.attached_to in live else next(iter(live), None)
+            if key is None:
+                continue
         new = SourceItem(source_type=old.source_type, filename=old.filename,
-                         reread_of=old.reread_of or old.id, careful=True, report_for=old.report_for)
+                         reread_of=old.reread_of or old.id, careful=True, report_for=old.report_for,
+                         attached_to=old.attached_to)
         enc.sources.append(new)
         reread.add(root(old.id))
+        if old.attached_to and old.report_for is None:
+            attached.add(root(old.id))
         m.source_id = new.id
-        groups.setdefault(old.report_for, []).append(m)
+        groups.setdefault(key, []).append(m)
     # Bill lines are not reviewed, so the new reading of a bill simply replaces the old one.
     enc.bill_lines = [b for b in enc.bill_lines if root(b.provenance.source_id) not in reread]
     typed = {s.id for s in enc.sources if s.source_type == SourceType.TEXT}
@@ -192,6 +206,8 @@ def _reread(db: Storage, ai: AIClient, enc: Encounter, media: list[Media],
     enc.quote_failures = list(dict.fromkeys(failures))  # a report's run repeats the earlier ones
 
     for e in earlier:
+        if e.kind != EntryKind.RESULT and any(root(p.source_id) in attached for p in e.provenance):
+            continue  # only the values of an attached file are read again; its other entries stay
         if e.status == EntryStatus.PROPOSED:
             e.set_status(EntryStatus.REJECTED, by="system", note=REPLACED_NOTE)
         elif (e.added_as_read and not e.edits and e.status == EntryStatus.CONFIRMED
@@ -409,10 +425,25 @@ def _run(
         # values only, so there is nothing new to check.
         if report_test is None:
             enc.discrepancies = step("cross_checking", lambda: _cross_check(db, ai, enc))
+        if use is None:  # a new visit (not a re-read, not files added later): smart attach
+            enc.attach_suggestion = _attach_suggestion(db, ai, enc)
         enc.step = None
         enc.status = EncounterStatus.READY
         db.save_encounter(enc)
     return entries
+
+
+def _attach_suggestion(db: Storage, ai: AIClient, enc: Encounter) -> AttachSuggestion | None:
+    """A new visit of reports only may be the report for a test waiting on an earlier visit
+    (`attach.py`). The model is asked only when code finds candidates; a failed or useless answer
+    leaves the visit as its own, and never fails the read."""
+    found = attach.candidates(db, enc)
+    if not found:
+        return None
+    try:
+        return _step(db, ai, enc, "matching_report", lambda: attach.ask(ai, enc, found))
+    except Exception:  # noqa: BLE001 - the suggestion is optional
+        return None
 
 
 def _name_visit(db: Storage, enc: Encounter, extraction: Extraction,

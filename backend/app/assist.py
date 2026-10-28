@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime, timedelta
+from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
@@ -33,6 +34,7 @@ from app.pipeline import prompts
 from app.pipeline.quotes import quote_in_source
 from app.schemas.assist import (
     AskAnswer,
+    AskChart,
     AskPoint,
     AskPrevious,
     AskSource,
@@ -55,7 +57,14 @@ from app.schemas.record import (
     MedicationState,
 )
 from app.storage import Storage
-from app.views import consolidate, numbers, timeline, visit_dates, visit_uploaded
+from app.views import (
+    NumberSeries,
+    consolidate,
+    numbers,
+    timeline,
+    visit_dates,
+    visit_uploaded,
+)
 
 # ---- warning signs (code, never the model) ------------------------------------------------
 # Plain English labels. Patterns cover English and common Hinglish (Hindi in Latin letters).
@@ -546,9 +555,22 @@ class _Answer(BaseModel):
     points: list[_AskPoint] = Field(default_factory=list)
 
 
-def check_search_words(words: str, patient_name: str) -> bool:
-    """The search exception: a few general words may leave the app. At most
-    8 words, no digits, no part of the patient's name."""
+_LABEL_FILLER = {"type", "high", "low", "with", "from", "tablet", "tablets", "capsule", "capsules",
+                 "syrup", "chronic", "acute", "mild", "severe", "disease", "disorder"}
+
+
+def _record_words(labels: list[str]) -> set[str]:
+    """The words of the patient's medicine and condition labels (4 letters or more)."""
+    return {t for label in labels for t in re.findall(r"[^\W\d_]+", label.casefold())
+            if len(t) >= 4 and t not in _LABEL_FILLER}
+
+
+def check_search_words(words: str, patient_name: str, record_labels: list[str] | None = None,
+                       question: str = "") -> bool:
+    """The search exception: a few general words may leave the app. At most 8 words, no digits,
+    no part of the patient's name, and no word of a medicine or condition in the patient's record
+    unless the patient typed that word in this question (so the record never reaches a search
+    through the model's guess)."""
     words = words.strip()
     if not words or len(words) > 120 or any(c.isdigit() for c in words):
         return False
@@ -557,7 +579,10 @@ def check_search_words(words: str, patient_name: str) -> bool:
         return False
     name_parts = {p for p in re.findall(r"[^\W\d_]+", patient_name.casefold())
                   if len(p) >= 2 and p != "synthetic"}
-    return not name_parts.intersection(tokens)
+    if name_parts.intersection(tokens):
+        return False
+    typed = set(re.findall(r"[^\W\d_]+", question.casefold()))
+    return not _record_words(record_labels or []).intersection(set(tokens) - typed)
 
 
 def _site_name(url: str) -> str:
@@ -647,9 +672,56 @@ _CATEGORIES = ("good_to_know", "be_careful", "your_conditions")
 
 MAX_RECORD_EVENTS = 10
 MAX_RECORD_TESTS = 20
+MAX_CHARTS = 3
 RECORD_NOTE = "From your confirmed record. Ask your doctor before changing your medicines."
-RECORD_NONE_NOTE = "Your confirmed record doesn't show anything about this yet."
+RECORD_NONE_NOTE = ("This hasn't been added to your record yet. Add the visit or report it comes "
+                    "from, and it will show up here.")
 _PER_DAY = {1.0: "once a day", 2.0: "twice a day", 3.0: "three times a day"}
+
+
+def _tokens(text: str) -> list[str]:
+    """Numbers and words, so "40mg" and "40 mg" read the same."""
+    return re.findall(r"\d+(?:\.\d+)?|[^\W\d_]+", text.casefold())
+
+
+def _without_repeats(label: str, parts: list[str]) -> str:
+    """The detail line minus what the label already says ("Amlodipine 5 mg" + "5 mg, once a day"
+    leaves "once a day"). Whole tokens in a row only: "25mcg" is not in "Thyroxine 125mcg"."""
+    own = _tokens(label)
+
+    def said(part: str) -> bool:
+        mine = _tokens(part)
+        return bool(mine) and any(own[i:i + len(mine)] == mine
+                                  for i in range(len(own) - len(mine) + 1))
+
+    return ", ".join(p for p in parts if p and not said(p))
+
+
+def _numbers_link(group_key: str) -> str:
+    return f"/numbers/{quote(group_key, safe='')}"
+
+
+class _Links:
+    """Where each item of the record came from, as app routes. Built from the record by code."""
+
+    def __init__(self, entries: list[Entry], encounters: list[Encounter]) -> None:
+        self.by_id = {e.id: e for e in entries}
+        self.visible = set(self.by_id)
+
+    def visit(self, entry: Entry | None) -> tuple[str, str]:
+        if entry is not None and entry.encounter_id:
+            return f"/encounters/{entry.encounter_id}", "Open visit"
+        return "/record", "Open My record"
+
+    def report(self, entry_id: str) -> str:
+        """`/reports/<test id>` for the report a value was read from; "" when it has none."""
+        value = self.by_id.get(entry_id)
+        for test_id in (value.links if value is not None else []):
+            test = self.by_id.get(test_id)
+            if (test is not None and test.kind == EntryKind.TEST and test.id in self.visible
+                    and test.status == EntryStatus.CONFIRMED):
+                return f"/reports/{test.id}"
+        return ""
 
 
 def _frequency(per_day: float | None) -> str:
@@ -664,25 +736,32 @@ def record_items_for(entries: list[Entry], encounters: list[Encounter],
     medicines (dose and how often when known), allergies, conditions, recent events and the
     latest value of each test with its range and date. The ids are what the model may point at."""
     today = today or date.today()
-    rows: list[tuple[str, str, str]] = []  # kind, label, detail
+    links = _Links(entries, encounters)
+    rows: list[dict[str, str]] = []
+
+    def row(kind: str, label: str, detail: str = "", source: Entry | None = None, **more: str):
+        link, link_label = links.visit(source)
+        rows.append({"kind": kind, "label": label, "detail": detail, "link": link,
+                     "link_label": link_label, **more})
+
     for e in _latest(entries, encounters, EntryKind.MEDICATION):
         m = e.medication
         state = m.state(today) if m else MedicationState.END_UNKNOWN
         if state in SHOWN_ON_CARD:
-            detail = ", ".join(x for x in (m.dose if m else None,
-                                           _frequency(m.doses_per_day) if m else "") if x)
-            rows.append(("medicine", e.label, detail))
+            detail = _without_repeats(e.label, [(m.dose or "") if m else "",
+                                                _frequency(m.doses_per_day) if m else ""])
+            row("medicine", e.label, detail, e)
     for e in _latest(entries, encounters, EntryKind.ALLERGY):
-        rows.append(("allergy", e.label, ""))
+        row("allergy", e.label, "", e)
     for e in _latest(entries, encounters, EntryKind.DIAGNOSIS):
-        rows.append(("condition", e.label, ""))
+        row("condition", e.label, "", e)
     confirmed = [e for e in entries
                  if e.status == EntryStatus.CONFIRMED]
     cutoff = (today - timedelta(days=RECENT_DAYS)).isoformat()
     events = [e for e in timeline(confirmed)
               if e.occurred_on and e.occurred_on >= cutoff[:len(e.occurred_on)]]
     for e in events[:MAX_RECORD_EVENTS]:
-        rows.append(("event", e.label, e.occurred_on or ""))
+        row("event", e.label, _without_repeats(e.label, [e.occurred_on or ""]), e)
     tests = 0
     for group in numbers(entries, encounters).groups:
         for series in group.series:
@@ -697,23 +776,93 @@ def record_items_for(entries: list[Entry], encounters: list[Encounter],
                            else f"up to {_g(high)}" if high is not None else f"from {_g(low)}")
                 detail += f" (printed range {printed}"
                 detail += f", {p.position})" if p.position in ("low", "high") else ")"
-            rows.append(("test", series.name, detail))
+            report = links.report(p.entry_id)
+            source = links.by_id.get(p.entry_id)
+            history, direction, position = _facts(series)
+            row("test", series.name, detail, source, numbers_link=_numbers_link(group.key),
+                group_key=group.key, history=history, direction=direction, position=position)
+            if report:  # the report it was read from beats the visit
+                rows[-1].update(link=report, link_label="See report")
+            elif source is None or not source.encounter_id:
+                rows[-1].update(link="", link_label="")  # added by the patient: only the numbers
             tests += 1
     seen: set[tuple[str, str, str]] = set()
     items: list[RecordItem] = []
-    for kind, label, detail in rows:
-        key = (kind, label.casefold(), detail)
-        if not label.strip() or key in seen:
+    for r in rows:
+        key = (r["kind"], r["label"].casefold(), r["detail"])
+        if not r["label"].strip() or key in seen:
             continue
         seen.add(key)
-        items.append(RecordItem(id=f"r{len(items) + 1}", kind=kind, label=label.strip(),
-                                detail=detail))
+        items.append(RecordItem(id=f"r{len(items) + 1}", **{**r, "label": r["label"].strip()}))
     return items
 
 
+_POSITION_WORD = {"high": "above", "low": "below", "within": "within"}
+
+
+def _facts(series: NumberSeries) -> tuple[str, str, str]:
+    """How a measure has gone, for the model and the checks on its summary (never shown): the
+    count of readings, the first and the one before the latest, whether the latest is higher,
+    lower or the same as the one before, and where it sits against the printed range. All of it
+    is decided here; the model only words it. Returns (text, direction, position)."""
+    live = [p for p in series.points if not p.removed]
+    if not live:
+        return "", "", ""
+    latest = live[-1]
+    parts: list[str] = []
+    direction = ""
+    if len(live) >= 2:
+        first, before = live[0], live[-2]
+        direction = ("higher" if latest.value > before.value
+                     else "lower" if latest.value < before.value else "the same")
+        parts += [f"{len(live)} readings since {first.on.isoformat()}",
+                  f"first {_g(first.value)}, the one before the latest {_g(before.value)}",
+                  f"the latest is {direction} than the one before" if direction != "the same"
+                  else "the latest is the same as the one before"]
+    position = _POSITION_WORD.get(latest.position or "", "")
+    if position:
+        parts.append(f"the latest is {position} the printed range"
+                     if position != "within" else "the latest is within the printed range")
+    return "; ".join(parts), direction, position
+
+
+def charts_for(kept: list[RecordItem], entries: list[Entry],
+               encounters: list[Encounter]) -> list[AskChart]:
+    """The full series of every measure the picked test items belong to (at most 3), straight
+    from the patient's numbers. Only picked test items bring a chart; the model never writes one."""
+    keys: list[str] = []
+    for item in kept:
+        if item.kind == "test" and item.group_key and item.group_key not in keys:
+            keys.append(item.group_key)
+    if not keys:
+        return []
+    groups = {g.key: g for g in numbers(entries, encounters).groups}
+    links = _Links(entries, encounters)
+    charts: list[AskChart] = []
+    for key in keys:
+        group = groups.get(key)
+        if group is None:
+            continue
+        series = []
+        for s in group.series:
+            live = [p for p in s.points if not p.removed]
+            if live:
+                series.append(s.model_copy(update={"points": live}))
+        if not series:
+            continue
+        newest = max((p for s in series for p in s.points), key=lambda p: p.on)
+        charts.append(AskChart(key=key, name=group.name, series=series,
+                               report_link=links.report(newest.entry_id),
+                               numbers_link=_numbers_link(key)))
+        if len(charts) == MAX_CHARTS:
+            break
+    return charts
+
+
 def _record_list(items: list[RecordItem]) -> str:
-    return "\n".join(f"{i.id}. [{i.kind}] {i.label}{': ' + i.detail if i.detail else ''}"
-                     for i in items)
+    return "\n".join(
+        f"{i.id}. [{i.kind}] {i.label}{': ' + i.detail if i.detail else ''}"
+        f"{' | history: ' + i.history if i.history else ''}" for i in items)  # facts from code
 
 
 def _record_part(question: str, items: list[RecordItem], ai: AIClient,
@@ -743,16 +892,58 @@ _IMPERATIVE = re.compile(r"\W*(please\s+)?(take|use|apply|eat|drink|try|avoid|st
                          r"increase|reduce|lower|raise|switch|change|skip|double|halve)\b", re.IGNORECASE)
 
 
+# Words that judge a value. The report's range is the "printed range"; whether a number is good,
+# normal or controlled is for the patient's doctor, never for this summary.
+_JUDGING = re.compile(
+    r"\b(better|worse|good|bad|improv\w*|worsen\w*|normal|abnormal|controlled|uncontrolled|"
+    r"healthy|concerning)\b", re.IGNORECASE)
+_CLAUSE = re.compile(r"[;,:]|\b(?:and|but|while|whereas|though|although)\b", re.IGNORECASE)
+_DIRECTION_WORD = re.compile(r"\b(higher|lower|the same)\b", re.IGNORECASE)
+_POSITION_WORDS = re.compile(r"\b(above|below|within)\b", re.IGNORECASE)
+_STOP = {"and", "the", "for", "of", "in", "with", "test", "level", "levels"}
+
+
+def _names(text: str, item: RecordItem) -> bool:
+    """The text names the measure: every word of its name is there ("Blood sugar (fasting)" is
+    named by "fasting blood sugar")."""
+    wanted = [t for t in _tokens(item.label) if t not in _STOP and not t.isdigit()]
+    have = set(_tokens(text))
+    return bool(wanted) and all(t in have for t in wanted)
+
+
+def _words_match_facts(sentences: list[str], kept: list[RecordItem]) -> bool:
+    """A direction or range word ("higher", "lower", "above", "below", "within") in a summary must
+    be the one the code worked out for the measure it is about. A clause that names a measure is
+    about it; one that names none (the "both remain above ..." after an "and") is about the
+    measures its sentence names. A word with no code fact behind it is not allowed."""
+    tests = [i for i in kept if i.kind == "test"]
+    for sentence in sentences:
+        in_sentence = [i for i in tests if _names(sentence, i)]
+        for clause in _CLAUSE.split(sentence):
+            if not clause:
+                continue
+            named = [i for i in tests if _names(clause, i)] or in_sentence
+            for words, fact in ((_DIRECTION_WORD, "direction"), (_POSITION_WORDS, "position")):
+                for word in words.findall(clause):
+                    if not named:
+                        continue  # about no measure of the record: nothing to compare with
+                    if not any(getattr(i, fact) == word.casefold() for i in named):
+                        return False
+    return True
+
+
 def _record_summary_ok(summary: str, kept: list[RecordItem], medicines: list[str]) -> bool:
     """Reading back the record ("Amlodipine 5 mg once a day") is not advice, so the dose check is
     replaced by this: every number in the summary must be in the kept items. Everything else is
     as for any AI summary (length, sentences, no orders, no instructions about medicines)."""
-    record_text = " ".join(f"{i.label} {i.detail}" for i in kept)
+    record_text = " ".join(f"{i.label} {i.detail} {i.history}" for i in kept)
     record_numbers = set(re.findall(r"\d+(?:\.\d+)?", record_text))
     if any(n not in record_numbers for n in re.findall(r"\d+(?:\.\d+)?", summary)):
         return False
     sentences = [x for x in re.split(r"(?<=[.!?])\s+", summary.strip()) if x.strip(" .!?")]
     if any(_IMPERATIVE.match(s) for s in sentences):  # "Take 500 mg daily." is an order
+        return False
+    if _JUDGING.search(summary) or not _words_match_facts(sentences, kept):
         return False
     return (len(summary) <= MAX_SUMMARY_CHARS and len(sentences) <= MAX_SUMMARY_SENTENCES
             and not _YOU_ORDERS.search(summary) and not DIRECTIVE.search(summary)
@@ -814,6 +1005,7 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
         try:
             out.record_items, out.record_summary = _record_part(
                 question, record_items_for(entries, encounters, today), ai, context)
+            out.charts = charts_for(out.record_items, entries, encounters)
         except AIError:
             if kind == "record":
                 raise
@@ -824,13 +1016,18 @@ def ask(patient: Patient, entries: list[Entry], encounters: list[Encounter], que
             return out
 
     words = " ".join(plan.search_words.split())
-    if not check_search_words(words, patient.name):
+    labels = [e.label for kind_ in (EntryKind.MEDICATION, EntryKind.DIAGNOSIS)
+              for e in _latest(entries, encounters, kind_)]
+    # Words the patient typed (this question, or the one it follows up) may name their own condition.
+    typed = f"{question} {previous.question if previous else ''}"
+    if not check_search_words(words, patient.name, labels, typed):
         if kind == "both" and out.record_items:  # the record part alone is still an answer
             out.note = RECORD_NOTE
             out.allergy_notes = allergy_notes(record.allergies, question)
             out.models_used = models()
             return out
         out.note = GENERAL_WORDS_NOTE
+        out.allergy_notes = allergy_notes(record.allergies, question)
         out.models_used = models()
         return out
 

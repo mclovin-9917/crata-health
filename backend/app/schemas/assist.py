@@ -12,6 +12,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from app.views import NumberSeries
+
 
 def _id() -> str:
     return uuid.uuid4().hex
@@ -141,12 +143,35 @@ class RecordItem(BaseModel):
     kind: Literal["medicine", "allergy", "condition", "event", "test"]
     label: str
     detail: str = ""
+    # Where the item came from, built by code from the record (never from model text). App routes
+    # such as "/encounters/<id>", "/reports/<test id>", "/record"; "" when there is none.
+    link: str = ""
+    link_label: str = ""
+    numbers_link: str = Field(default="", description="Tests: the measure on My health numbers")
+    group_key: str = Field(default="", description="Tests: the card key on My health numbers")
+    # How the measure has gone (counted by code). Read by the model and the number check only.
+    history: str = Field(default="", exclude=True)
+    direction: str = Field(default="", exclude=True, description="higher, lower or the same")
+    position: str = Field(default="", exclude=True, description="above, below or within the range")
+
+
+class AskChart(BaseModel):
+    """One measure's whole series, built by code from the patient's numbers for a picked test
+    value. `series` is what My health numbers draws (several lines when the measures share a card,
+    like blood pressure); readings the patient removed are left out."""
+
+    key: str
+    name: str
+    series: list[NumberSeries]
+    report_link: str = Field(default="", description="The newest reading's report")
+    numbers_link: str = ""
 
 
 class AskAnswer(BaseModel):
     kind: Literal["record", "general", "both", "not_health"] = "general"
     record_items: list[RecordItem] = Field(default_factory=list)
     record_summary: str | None = None
+    charts: list[AskChart] = Field(default_factory=list)
     summary: str | None = None
     urgent: bool = False
     warning_signs: list[str] = Field(default_factory=list)

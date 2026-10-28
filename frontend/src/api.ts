@@ -183,6 +183,19 @@ export interface Encounter {
   /** Entry id -> why it needs a look of its own: a note from the checks, a clash with an allergy
    * or the bill, or wording that was unclear. Such rows stay open and Confirm all skips them. */
   flagged?: Record<string, FlagReason>;
+  /** Smart attach: set on a new visit of reports when it may be the report for a test waiting on an
+   * earlier visit (and the suggestion still holds). The patient adds it there or keeps the visit. */
+  attach_to?: AttachTarget | null;
+}
+
+/** The earlier visit and its waiting tests a visit of reports may belong to (the AI only suggests
+ * it; the words on the card are built from the patient's own test names). */
+export interface AttachTarget {
+  encounter_id: string;
+  test_entry_ids: string[];
+  test_labels: string[];
+  visit_date: string | null;
+  visit_title: string | null;
 }
 
 export type FlagReason = "check" | "clash" | "unsure";
@@ -459,13 +472,34 @@ export interface AskPoint {
 }
 export interface AskSource { n: number; site: string; title: string; url: string }
 
-export interface AskRecordItem { id: string; kind: string; label: string; detail: string }
+/** `link` and `numbers_link` are app routes built by the server ("/encounters/<id>", "/reports/<id>",
+ * "/record", "/numbers/<key>"); "" when there is none. Answers kept before they existed lack them. */
+export interface AskRecordItem {
+  id: string;
+  kind: string;
+  label: string;
+  detail: string;
+  link?: string;
+  link_label?: string;
+  numbers_link?: string;
+  group_key?: string;
+}
+
+/** One measure's whole series for a number question, drawn like My health numbers. */
+export interface AskChart {
+  key: string;
+  name: string;
+  series: NumberSeries[];
+  report_link: string;
+  numbers_link: string;
+}
 
 /** Ask about my health: an answer from trusted sites (not stored on the server). */
 export interface AskAnswer {
   kind?: "record" | "general" | "both" | "not_health";
   record_items?: AskRecordItem[];
   record_summary?: string | null;
+  charts?: AskChart[];
   summary?: string | null;
   urgent: boolean;
   warning_signs: string[];
@@ -623,4 +657,12 @@ export const api = {
     generics.forEach((g) => q.append("generics", g));
     return request<MedicineInfo>(`/medicine-info?${q}`);
   },
+  /** Smart attach: add this visit's report values to the earlier visit's test. Returns that visit's id;
+   * this visit is gone afterwards. A 409 means the suggestion no longer holds. */
+  attachVisit: (encounterId: string, target: AttachTarget) =>
+    request<{ encounter_id: string }>(
+      `/encounters/${encounterId}/attach`,
+      json("POST", { encounter_id: target.encounter_id, test_entry_ids: target.test_entry_ids })),
+  /** Smart attach: keep the visit as its own (clears the suggestion). */
+  keepVisit: (encounterId: string) => request<void>(`/encounters/${encounterId}/attach`, { method: "DELETE" }),
 };

@@ -12,6 +12,7 @@ import {
   addedToVisit, clashLine, genericLine,
 } from "../components";
 import { AddToVisit } from "../addToVisit";
+import { AttachCard } from "../attach";
 import { DeleteVisit } from "../deleteVisit";
 import { editedByPatient, formatDate, go, kindLabel, stepLabels, translated, useLoad } from "../lib";
 import { isSettled, visitMedia, wasReplaced } from "../media";
@@ -127,6 +128,8 @@ export default function EncounterScreen({ encounterId }: { encounterId: string }
           {toReview.length > 0 && <Progress done={shown.length - toReview.length} total={shown.length} />}
         </header>
       )}
+
+      {enc.attach_to && <AttachCard enc={enc} target={enc.attach_to} onKept={reload} />}
 
       {enc.discrepancies.length > 0 && <Checks found={enc.discrepancies} enc={enc} />}
 
@@ -861,6 +864,8 @@ function expectedSteps(enc: Encounter): string[] {
   if (audio && has("image")) steps.push("finding_drug_names");
   if (audio) steps.push("transcribing");
   steps.push("extracting", "checking_medicines", "cross_checking");
+  // Only a visit of reports with a waiting test on an earlier visit has this step.
+  if (enc.step === "matching_report" || "matching_report" in enc.step_seconds) steps.push("matching_report");
   return steps;
 }
 

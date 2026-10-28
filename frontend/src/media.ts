@@ -79,6 +79,15 @@ export const visitMedia = {
     return wanted.length && found.every(Boolean) ? (found as Local[]) : null;
   },
 
+  /** The visit's files now belong to another visit (smart attach moved its documents there): the
+   * copy in this browser follows them, so the proof and a careful re-read still find the files. The
+   * sources keep their ids, so only the visit they are filed under changes. */
+  async move(fromEncounterId: string, toEncounterId: string) {
+    for (const local of memory.values()) if (local.encounterId === fromEncounterId) local.encounterId = toEncounterId;
+    const rows = await withStore<Saved[]>("readonly", (s) => s.index("encounterId").getAll(fromEncounterId));
+    for (const row of rows ?? []) await withStore("readwrite", (s) => s.put({ ...row, encounterId: toEncounterId }));
+  },
+
   /** Delete a visit's files from the browser's storage. The open tab keeps its copy until it
    * closes, so the proof does not vanish the moment the last suggestion is reviewed. */
   async drop(encounterId: string) {
