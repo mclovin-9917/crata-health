@@ -1,6 +1,7 @@
-import { CircleCheck, HeartPulse, House, Siren, X } from "lucide-react";
+import { CircleCheck, House, Siren, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type EmergencySummary, type MeView } from "../api";
+import { CrataMark } from "../logo";
 import { EmergencyCard, ErrorNote } from "../components";
 import { go, rememberReturn } from "../lib";
 
@@ -65,7 +66,7 @@ export default function DoctorScreen({ patientId, code }: { patientId: string; c
     <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-2 font-bold tracking-tight text-ink-900">
-          <span className="tile size-8 rounded-lg"><HeartPulse size={18} aria-hidden /></span>
+          <CrataMark size={28} />
           Crata Health
         </span>
         <span className="chip bg-ink-100 text-ink-700">Prototype: registry numbers are not verified</span>

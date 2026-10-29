@@ -1,3 +1,5 @@
+<img src="frontend/public/favicon.svg" alt="" width="72" height="72">
+
 # Crata Health
 
 A health record that belongs to the patient. You add a doctor's visit by recording the consult (once the doctor agrees) or photographing the prescription, bill and reports. NVIDIA Nemotron models read them and suggest what goes into your record, each fact with the exact words it came from. You confirm what matters. The app checks a new medicine against your allergies and the bill against the prescription, and keeps an emergency card that a doctor can open from a QR code, with every opening logged and you alerted. Before a visit, it turns what you feel into a summary for the doctor; between visits, it answers questions about your record and your diet.

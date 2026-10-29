@@ -1,6 +1,7 @@
-import { AlertTriangle, ChevronLeft, ChevronRight, HeartPulse, LogOut, ScanLine } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, LogOut, ScanLine } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, SIGNED_OUT, type MeView, type Patient } from "./api";
+import { CrataMark } from "./logo";
 import { go, takeReturn, useRoute } from "./lib";
 import { isSettled, visitMedia } from "./media";
 import AccessScreen from "./screens/Access";
@@ -146,7 +147,7 @@ function Shell({ account, children }: { account?: AccountState; children: ReactN
       <header className="sticky top-0 z-20 border-b border-white/70 bg-white/60 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex max-w-3xl items-center gap-x-3 px-4 py-3 sm:flex-wrap sm:gap-y-2">
           <a href="#/" className="flex items-center gap-2 font-bold tracking-tight text-ink-900">
-            <span className="tile size-8 rounded-lg"><HeartPulse size={18} aria-hidden /></span>
+            <CrataMark size={28} />
             Crata Health
           </a>
           <span className="chip shrink-0 bg-ink-100 text-ink-700"><span>Prototype<span className="hidden sm:inline">,&nbsp;made-up data</span></span></span>

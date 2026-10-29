@@ -38,6 +38,8 @@
   --color-lagoon-700: #2a5449;
   --color-lagoon-800: #20423a;
   --color-lagoon-900: #162e28;
+  /* The logo's mint (heartbeat and folded corner). For the logo only, not the rest of the UI. */
+  --color-mint: #7cc8ae;
 
   /* Slate blue: links and the AI's "Suggested" marker. */
   --color-tide-50: #e6eff3;
