@@ -51,7 +51,7 @@ export default function HomeScreen() {
   return (
     <div className="space-y-6">
       <section className="hero">
-        <h1 className="text-4xl font-bold tracking-tight">{me.name}</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{me.name}</h1>
         {record.data && (
           <p className="mt-1 text-white">
             {visits} visit{visits === 1 ? "" : "s"} in your record
@@ -124,14 +124,14 @@ export default function HomeScreen() {
           icon={<ClipboardList size={24} aria-hidden />}
           tile=""
           title="Before a visit"
-          sub="Tell us what you feel. Get a summary for your doctor."
+          sub="Get a summary for your doctor"
         />
         <BigAction
           onClick={() => go("/ask")}
           icon={<MessageCircleQuestion size={24} aria-hidden />}
           tile=""
           title="Ask about my health"
-          sub="Your record, food and daily life. Answers show where they came from."
+          sub="Your record, food and daily life"
         />
       </div>
 
@@ -279,9 +279,9 @@ function BigAction({ onClick, icon, tile, title, sub, danger }: {
         danger ? "ring-1 ring-red-200" : ""
       }`}
     >
-      <span className={`tile size-12 rounded-2xl ${tile}`}>{icon}</span>
+      <span className={`tile size-10 sm:size-12 rounded-2xl ${tile}`}>{icon}</span>
       <span>
-        <span className={`block text-lg font-bold leading-tight tracking-tight ${danger ? "text-red-800" : ""}`}>{title}</span>
+        <span className={`block text-base sm:text-lg font-bold leading-tight tracking-tight ${danger ? "text-red-800" : ""}`}>{title}</span>
         <span className="mt-0.5 block text-sm text-ink-600">{sub}</span>
       </span>
     </button>

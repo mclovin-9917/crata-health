@@ -2,7 +2,7 @@ import { AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { api, EVENT_KINDS, type Entry, type EntryKind, type Fact, type Visit } from "../api";
 import { useMe } from "../App";
-import { DisclosureButton, EntryDetails, ErrorNote, PatientBasics, SaidBy, Timeline, addedToVisit, groupByPrefix, valueText } from "../components";
+import { DisclosureButton, DoseColumn, EntryDetails, ErrorNote, PatientBasics, SaidBy, Timeline, addedToVisit, groupByPrefix, valueText } from "../components";
 import { MedicineName } from "../medicine";
 import { AddReport, confirmedValuesOf, groupValues, outsideRange, reportDate } from "../results";
 import { STAY_KIND } from "../stay";
@@ -58,18 +58,19 @@ export default function RecordScreen() {
   );
 }
 
-/** One fact's row: the fact, its action (if any), then an icon-only chevron at the right end; the
- * details open below the row. */
-function FactRow({ main, action, name, children }: { main: ReactNode; action: ReactNode; name: string; children: ReactNode }) {
+/** One fact's row: the fact, then an icon-only chevron at the right end; the details open below the
+ * row. `below` is a second row under the name line (a medicine's details and frequency column),
+ * which the chevron's height sits beside. */
+function FactRow({ main, below, name, children }: { main: ReactNode; below?: ReactNode; name: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
     <li>
       <div className="flex flex-wrap items-start gap-x-2">
         <div className="min-w-0 grow py-1">{main}</div>
-        {action}
         <DisclosureButton label="Show details" name={name} variant="icon" open={open} controls={id} onToggle={() => setOpen(!open)} />
       </div>
+      {below && <div className="-mt-2">{below}</div>}
       <div id={id} hidden={!open}>
         {open && children}
       </div>
@@ -125,6 +126,7 @@ function Summary({ facts, visits, timeline, reload }: {
   // One fact, once. `text` replaces the label when a shared title is shown above a group.
   const fact = (f: Fact, text?: string) => {
     const own = f.kind === "medication" ? f.latest : null;
+    const medicine = f.kind === "medication";
     return (
     <FactRow
       key={f.key}
@@ -136,10 +138,20 @@ function Summary({ facts, visits, timeline, reload }: {
             {editedByPatient(f.latest) && <span className="text-xs text-amber-700">Edited by you</span>}
             {translated(f.latest) && <span className="text-xs text-ink-500">Translated</span>}
           </div>
-          <EntryDetails entry={f.latest} />
+          {!medicine && <EntryDetails entry={f.latest} />}
         </>
       }
-      action={null}
+      below={
+        medicine ? (
+          // Two rows for a medicine: the name line above, then the details with the frequency column.
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <EntryDetails entry={f.latest} dose="column" />
+            </div>
+            <DoseColumn entry={f.latest} />
+          </div>
+        ) : null
+      }
     >
       <div className="flex flex-wrap items-center gap-2 pb-1">
         <SaidBy speaker={f.latest.said_by} added={addedToVisit(f.latest)} />

@@ -91,6 +91,19 @@ function VisitForm({ stayId, testId }: { stayId?: string; testId?: string }) {
   };
 
   const addDocuments = (files: File[]) => setDocuments((docs) => [...docs, ...files]);
+  // A new visit's file picker also takes a recording of the consult.
+  const withAudio = !testId && !stayId;
+  const pickFiles = (files: File[]) => {
+    if (!withAudio) return addDocuments(files);
+    const recording = files.find(isAudio);
+    if (recording) {
+      setAudio(asAudio(recording));
+      if (!consent) {
+        document.getElementById("recording-consent")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
+    addDocuments(files.filter((f) => !isAudio(f)));
+  };
   const nothing = !audio && documents.length === 0 && !notes.trim();
   const needsConsent = !!audio && !consent;
   return (
@@ -120,7 +133,7 @@ function VisitForm({ stayId, testId }: { stayId?: string; testId?: string }) {
       </div>
 
       {!stayId && <div className="card space-y-3">
-        <h2 className="section-title">Recording</h2>
+        <h2 className="section-title">Record the consult</h2>
         <label
           htmlFor="recording-consent"
           className={`flex items-start gap-3 rounded-2xl px-4 py-3 text-sm ring-1 ${
@@ -137,12 +150,6 @@ function VisitForm({ stayId, testId }: { stayId?: string; testId?: string }) {
           <span>Tick to confirm the doctor agrees to be recorded. Ask before you start.</span>
         </label>
         <Recorder onDone={setAudio} />
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-ink-500">or</span>
-          <FilePick accept="audio/*" onPick={(files) => setAudio(files[0] ?? null)}>
-            <Mic size={16} aria-hidden /> Upload a recording
-          </FilePick>
-        </div>
         {audioUrl && (
           <div className="flex items-center gap-2 text-sm">
             <audio controls src={audioUrl} />
@@ -154,10 +161,16 @@ function VisitForm({ stayId, testId }: { stayId?: string; testId?: string }) {
       <div className="card space-y-3">
         <div>
           <h2 className="section-title">
-            {testId ? "The report" : stayId ? "Discharge summary, reports, bills" : "Prescriptions, bills, reports"}
+            {testId
+              ? "The report"
+              : stayId
+              ? "Discharge summary, reports, bills"
+              : "Prescriptions, bills, reports, recordings"}
           </h2>
           <p className="text-sm text-ink-600">
-            Add photos, screenshots or PDFs (up to 10 pages each).
+            {withAudio
+              ? "Add photos, screenshots or PDFs (up to 10 pages each), or a recording of the consult."
+              : "Add photos, screenshots or PDFs (up to 10 pages each)."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -166,12 +179,33 @@ function VisitForm({ stayId, testId }: { stayId?: string; testId?: string }) {
               <Camera size={16} aria-hidden /> Take a photo
             </FilePick>
           )}
-          <FilePick accept="image/*,application/pdf,.pdf" multiple onPick={addDocuments}>
+          <FilePick
+            accept={withAudio ? "image/*,application/pdf,.pdf,audio/*,.opus,.amr,.3gp" :"image/*,application/pdf,.pdf"}
+            multiple
+            onPick={pickFiles}
+          >
             <FileUp size={16} aria-hidden /> Choose files
           </FilePick>
         </div>
-        {documents.length > 0 && (
+        {(documents.length > 0 || audio) && (
           <ul className="flex flex-wrap gap-3">
+            {audio && (
+              <li className="relative w-24 text-xs">
+                <div className="grid h-24 place-items-center rounded-xl bg-white/85 text-lagoon-700 ring-1 ring-ink-200">
+                  <Mic size={32} aria-hidden />
+                </div>
+                <p className="mt-1 truncate text-ink-600" title={audio.name}>
+                  <span className="sr-only">Recording: </span>{audio.name}
+                </p>
+                <button
+                  className="absolute -top-2 -right-2 grid size-7 place-items-center rounded-full bg-white text-ink-700 shadow ring-1 ring-ink-200 hover:text-ink-900"
+                  aria-label={`Remove ${audio.name}`}
+                  onClick={() => setAudio(null)}
+                >
+                  <X size={14} aria-hidden />
+                </button>
+              </li>
+            )}
             {documents.map((f, i) => (
               <li key={i} className="relative w-24 text-xs">
                 {isPdf(f) ? (
@@ -321,6 +355,23 @@ function Recorder({ onDone }: { onDone: (f: File) => void }) {
     </div>
   );
 }
+
+const AUDIO_TYPES: Record<string, string> = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  opus: "audio/ogg",
+  webm: "audio/webm",
+  aac: "audio/aac",
+  amr: "audio/amr",
+  "3gp": "audio/3gpp",
+};
+const audioExt = (f: File) => /\.([a-z0-9]+)$/i.exec(f.name)?.[1].toLowerCase() ?? "";
+const isAudio = (f: File) => f.type.startsWith("audio/") || audioExt(f) in AUDIO_TYPES;
+/** The server takes audio only when the upload's type starts with "audio/": give a file known only by its name that type. */
+const asAudio = (f: File) =>
+  f.type.startsWith("audio/") ? f : new File([f], f.name, { type: AUDIO_TYPES[audioExt(f)] });
 
 const isPdf = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
 

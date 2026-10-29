@@ -1,12 +1,12 @@
 import {
-  Activity, AlertTriangle, Building2, CalendarClock, ChevronDown, Droplet, FileText, FlaskConical, Gauge, Hospital, Lock, Pill, Pin, ShieldAlert, Siren, Stethoscope,
-  Syringe, Thermometer, User, type LucideIcon,
+  Activity, AlertTriangle, Building2, CalendarClock, ChevronDown, Droplet, FileText, FlaskConical, Gauge, Hospital, Lock, MoreHorizontal, Pill, Pin, ShieldAlert, Siren,
+  Stethoscope, Syringe, Thermometer, User, type LucideIcon,
 } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type {
   EmergencySummary, Encounter, Entry, EntryCheck, EntryKind, FlagReason, MedicationState, Patient, SourceItem, Speaker, TestResult,
 } from "./api";
-import { age, dosePattern, formatDate, kindLabel, locatorStart, sexWord } from "./lib";
+import { age, dosePattern, doseWords, formatDate, kindLabel, locatorStart, sexWord } from "./lib";
 import { visitMedia } from "./media";
 import { MedicineName } from "./medicine";
 
@@ -333,10 +333,44 @@ export function rangeText(r: TestResult): string | null {
   return r.ref_text;
 }
 
-/** One line of the key facts: "500 mg · 1 per day · 3 days · rash". */
-export function EntryDetails({ entry }: { entry: Entry }) {
+const capFirst = (s: string) => s.replace(/^./, (c) => c.toUpperCase());
+
+/** One field of an entry in words: "how often: 1-0-1 (morning and night)", a date as a date,
+ * anything else as "key: value". `bare`: an `instructions` value alone ("After food"), for the
+ * medicine lines of `dose="column"`; elsewhere it keeps its label ("instructions: after food"). */
+function fieldBit(k: string, v: string, bare = false): string {
+  if (bare && k === "instructions") return capFirst(v);
+  const shown = k === "frequency" ? dosePattern(v) : isDay(v) ? formatDate(v) : v;
+  return `${FIELD_WORDS[k] ?? k}: ${shown}`;
+}
+
+/** The key facts: "500 mg · 1 per day · 3 days · rash" on one line. `dose="column"` is for a
+ * medicine whose frequency sits in a `DoseColumn` beside it: the frequency is left out and the
+ * rest goes on two short lines (the dose and instructions, then the course). */
+export function EntryDetails({ entry, dose = "inline" }: { entry: Entry; dose?: "column" | "inline" }) {
   const m = entry.medication;
   const r = entry.result;
+  // A dose the name already says ("625 mg" in "Augmentin 625 mg", or the name itself) is not repeated.
+  const doseText = m?.dose && !entry.label.toLowerCase().includes(m.dose.trim().toLowerCase()) ? m.dose : null;
+  if (dose === "column" && entry.kind === "medication") {
+    const what: string[] = [];
+    if (doseText) what.push(dosePattern(doseText));
+    // The column shows a pattern or its words, or the raw text; then the count would be lost.
+    const freq = entry.fields.frequency?.trim();
+    if (freq && !dashParts(freq) && !doseWords(freq) && m?.doses_per_day) what.push(`${m.doses_per_day} per day`);
+    for (const [k, v] of Object.entries(entry.fields)) {
+      if (HIDDEN_FIELDS.has(k) || k === "frequency") continue; // the column shows the frequency
+      what.push(fieldBit(k, v, true));
+    }
+    if (entry.occurred_on) what.push(isDay(entry.occurred_on) ? formatDate(entry.occurred_on) : entry.occurred_on);
+    if (entry.unverified) what.push("from memory, no document");
+    const course: string[] = [];
+    const line = m && courseLine(m);
+    if (line) course.push(line);
+    if (m?.stopped_on) course.push(`stopped ${formatDate(m.stopped_on)}`);
+    const lines = [what.join(" · "), course.join(" · ")].filter(Boolean);
+    return lines.length ? <div className="text-sm text-ink-600">{lines.map((l) => <p key={l}>{l}</p>)}</div> : null;
+  }
   const bits: string[] = [];
   if (r) {
     bits.push(valueText(r));
@@ -344,15 +378,14 @@ export function EntryDetails({ entry }: { entry: Entry }) {
     if (range) bits.push(`printed range ${range}`);
     if (r.measured_on) bits.push(formatDate(r.measured_on));
   }
-  if (m?.dose) bits.push(dosePattern(m.dose));
+  if (doseText) bits.push(dosePattern(doseText));
   if (m?.doses_per_day) bits.push(`${m.doses_per_day} per day`);
   const course = m && courseLine(m);
   if (course) bits.push(course);
   if (m?.stopped_on) bits.push(`stopped ${formatDate(m.stopped_on)}`);
   for (const [k, v] of Object.entries(entry.fields)) {
     if (HIDDEN_FIELDS.has(k)) continue; // older entries repeat structured values
-    const shown = k === "frequency" ? dosePattern(v) : isDay(v) ? formatDate(v) : v;
-    bits.push(`${FIELD_WORDS[k] ?? k}: ${shown}`);
+    bits.push(fieldBit(k, v));
   }
   if (entry.occurred_on) bits.push(isDay(entry.occurred_on) ? formatDate(entry.occurred_on) : entry.occurred_on);
   if (entry.unverified) bits.push("from memory, no document");
@@ -360,6 +393,153 @@ export function EntryDetails({ entry }: { entry: Entry }) {
 }
 
 const isDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** "1-0-1", "1 - 0 - ½" or "1–0–1" (en or em dashes too): the parts of a 3 or 4 part pattern, else null. */
+function dashParts(text: string): string[] | null {
+  const parts = text.trim().split(/\s*[-–—]\s*/);
+  if (parts.length < 3 || parts.length > 4) return null;
+  return parts.every((p) => /^(\d+(\.\d+)?|\d*[½¼¾]|\d+\/\d+)$/.test(p)) ? parts : null;
+}
+
+const PART_NAMES: Record<number, string[]> = {
+  3: ["Morn", "Noon", "Night"],
+  4: ["Morn", "Noon", "Eve", "Night"],
+};
+const PART_WORDS: Record<number, string[]> = {
+  3: ["morning", "noon", "night"],
+  4: ["morning", "noon", "evening", "night"],
+};
+
+/** "Morning 1, noon 0, night 1 (morning and night)": the pattern in words for a screen reader. */
+function patternLabel(parts: string[]): string {
+  const said = PART_WORDS[parts.length].map((w, i) => `${i === 0 ? capFirst(w) : w} ${parts[i]}`).join(", ");
+  const words = doseWords(parts.join("-"));
+  return words ? `${said} (${words})` : said;
+}
+
+/** A medicine's frequency in its own fixed-width cell (w-28), so down a list of medicines every frequency
+ * sits in one aligned column: a small morning / noon / night table for a pattern like 1-0-1, a
+ * chip with words for "SOS" or "BD", else what was written. Empty (but still there) when unknown. */
+export function DoseColumn({ entry }: { entry: Entry }) {
+  if (entry.kind !== "medication") return null;
+  const raw = entry.fields.frequency?.trim() ?? "";
+  const parts = raw ? dashParts(raw) : null;
+  const words = raw ? doseWords(raw) : null;
+  const perDay = entry.medication?.doses_per_day;
+  let body: ReactNode = null;
+  if (parts) {
+    body = (
+      <div
+        role="img"
+        aria-label={patternLabel(parts)}
+        className={`grid w-full gap-x-1.5 text-center ${parts.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
+      >
+        {PART_NAMES[parts.length].map((n) => (
+          <span key={n} className="text-[9px] font-semibold tracking-wide text-ink-500 uppercase" aria-hidden>{n}</span>
+        ))}
+        {parts.map((p, i) => (
+          <span key={i} className={`text-base font-bold tabular-nums ${/^0+(\.0+)?$/.test(p) ? "text-ink-300" : "text-ink-900"}`} aria-hidden>{p}</span>
+        ))}
+      </div>
+    );
+  } else if (words) {
+    body = <span className="chip bg-tide-50 text-tide-800 text-center whitespace-normal">{capFirst(words)}</span>;
+  } else if (raw) {
+    body = <span className="chip bg-ink-100 text-ink-700 text-center whitespace-normal">{raw}</span>;
+  } else if (perDay) {
+    body = <span className="chip bg-ink-100 text-ink-700 text-center whitespace-normal">{perDay} a day</span>;
+  }
+  return <div className="flex w-28 shrink-0 justify-center pt-1">{body}</div>;
+}
+
+/** The "more actions" button of a row (a 44 px "..."), with a small menu under it: Edit, Remove and
+ * the like in one place instead of a button under every fact. Escape or a click outside closes it,
+ * the arrow keys move between the items, and choosing one closes it. */
+export function ActionsMenu({ name, items }: {
+  name: string; // what the row is about; screen readers hear "More actions for <name>"
+  items: { label: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const buttons = () => Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? []);
+
+  useEffect(() => {
+    if (!open) return;
+    buttons()[0]?.focus();
+    const away = (ev: PointerEvent) => {
+      if (!wrap.current?.contains(ev.target as Node)) setOpen(false);
+    };
+    // pointerdown, not mousedown: iOS Safari sends no mouse events for a tap on a non-clickable element.
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+
+  if (!items.length) return null;
+
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key === "Escape" && open) {
+      ev.stopPropagation();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (open && (ev.key === "ArrowDown" || ev.key === "ArrowUp")) {
+      ev.preventDefault();
+      const all = buttons();
+      if (!all.length) return;
+      const at = all.indexOf(document.activeElement as HTMLButtonElement);
+      const next = ev.key === "ArrowDown" ? (at + 1) % all.length : (at - 1 + all.length) % all.length;
+      all[next].focus();
+    } else if (open && ev.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={wrap} className="relative shrink-0" onKeyDown={onKeyDown}>
+      <button
+        ref={trigger}
+        type="button"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-700"
+        aria-label={`More actions for ${name}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen(!open)}
+      >
+        <MoreHorizontal size={18} aria-hidden />
+      </button>
+      {open && (
+        <div
+          ref={menu}
+          id={menuId}
+          role="menu"
+          aria-label={`More actions for ${name}`}
+          className="absolute top-full right-0 z-30 mt-1 min-w-40 rounded-2xl bg-white p-1 shadow-lg ring-1 ring-ink-200"
+        >
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-ink-800 hover:bg-ink-50 disabled:opacity-40"
+              onClick={() => {
+                setOpen(false);
+                trigger.current?.focus();
+                it.onSelect();
+              }}
+            >
+              {it.icon}
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // The trusted sites' short names, as in backend/app/medicine_info.py.
 const SITE_NAMES: Record<string, string> = {

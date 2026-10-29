@@ -158,11 +158,11 @@ export default function AskScreen() {
       </div>
 
       <form
-        className="card sticky bottom-3 z-10 space-y-2 p-3"
+        className="card sticky bottom-3 z-10 p-2 sm:p-3"
         onSubmit={submit}
         aria-label="Ask a question"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="ask-q">Your question</label>
           <input
             id="ask-q"
@@ -174,11 +174,11 @@ export default function AskScreen() {
             onChange={(e) => setQuestion(e.target.value)}
             readOnly={busy}
           />
+          <VoiceButton compact patientId={me.id} disabled={busy} onText={(t) => setQuestion((cur) => appendText(cur, t))} />
           <button className="btn min-h-11 shrink-0" type="submit" disabled={busy || !question.trim()}>
             {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <ArrowUp size={16} aria-hidden />} Ask
           </button>
         </div>
-        <VoiceButton patientId={me.id} disabled={busy} onText={(t) => setQuestion((cur) => appendText(cur, t))} />
       </form>
     </div>
   );
@@ -369,14 +369,18 @@ function ChartBlock({ chart }: { chart: AskChart }) {
       </div>
       <Chart series={chart.series} big />
       <BandNotes series={chart.series} />
-      <div className="flex flex-wrap gap-2 pt-1">
+      <div className="grid grid-cols-2 gap-2 pt-1">
         {chart.report_link && (
-          <a href={`#${chart.report_link}`} className="btn-light min-h-11" aria-label={`See the latest ${plainName(chart.name)} report`}>
-            <FileText size={16} aria-hidden /> See latest report
+          <a href={`#${chart.report_link}`} className="btn-light min-h-11 min-w-0 px-2 whitespace-normal text-center" aria-label={`Latest report for ${plainName(chart.name)}`}>
+            <FileText size={16} aria-hidden /> Latest report
           </a>
         )}
-        <a href={`#${chart.numbers_link}`} className="btn-light min-h-11" aria-label={`See all ${plainName(chart.name)} readings and reports`}>
-          <LineChart size={16} aria-hidden /> See all readings
+        <a
+          href={`#${chart.numbers_link}`}
+          className={`btn-light min-h-11 min-w-0 px-2 whitespace-normal text-center ${chart.report_link ? "" : "col-span-2 justify-self-start"}`}
+          aria-label={`All readings for ${plainName(chart.name)}, with their reports`}
+        >
+          <LineChart size={16} aria-hidden /> All readings
         </a>
       </div>
     </div>

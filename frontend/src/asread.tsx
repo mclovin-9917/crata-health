@@ -1,8 +1,8 @@
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { api, type Encounter, type Entry, type FlagReason } from "./api";
 import {
-  DisclosureButton, EditForm, EntryDetails, ErrorNote, FlagNotes, KindIcon, Proof, clashLine, groupByPrefix,
+  ActionsMenu, DisclosureButton, EditForm, EntryDetails, ErrorNote, FlagNotes, KindIcon, Proof, clashLine, groupByPrefix,
 } from "./components";
 import { editedByPatient } from "./lib";
 import { wasReplaced } from "./media";
@@ -40,7 +40,8 @@ export function AddedFromVisit({ enc, flags, onChange }: {
       <h2 className="section-title">
         Added from this visit <span className="font-semibold text-ink-400 tabular-nums">{count}</span>
       </h2>
-      <div className="card overflow-hidden p-0 ring-1 ring-green-500/40">
+      {/* No overflow clipping: each row's actions menu opens downward and may reach past the card's end. */}
+      <div className="card p-0 ring-1 ring-green-500/40">
         <p className="px-5 pt-4 text-sm text-ink-600">
           Added to your record as heard or printed. Fix anything that is wrong, or remove it.
         </p>
@@ -97,8 +98,8 @@ export function AddedFromVisit({ enc, flags, onChange }: {
   );
 }
 
-/** One fact read as it is. Proof, Edit and Remove; a removed row is struck through with "Add it
- * after all". Children (such as Add report) sit with the buttons. */
+/** One fact read as it is. Proof, and Edit and Remove in the ⋯ menu; a removed row is struck
+ * through with "Add back". Children (such as Add report) sit with the buttons. */
 function AsReadRow({ entry, enc, flag, onChange, nested, text, children }: {
   entry: Entry;
   enc: Encounter;
@@ -153,6 +154,21 @@ function AsReadRow({ entry, enc, flag, onChange, nested, text, children }: {
           <p className={`${nested ? "text-base" : "text-lg"} font-bold tracking-tight`}>{text ?? entry.label}</p>
           <EntryDetails entry={entry} />
         </div>
+        <ActionsMenu
+          name={entry.label}
+          items={[
+            {
+              label: "Edit",
+              icon: <Pencil size={16} aria-hidden />,
+              disabled: busy,
+              onSelect: () => {
+                setShowDetails(true); // the edit form lives in the details panel
+                setEditing(true);
+              },
+            },
+            { label: "Remove", icon: <X size={16} aria-hidden />, disabled: busy, onSelect: () => void act({ action: "reject" }) },
+          ]}
+        />
         <DisclosureButton
           label="Show details"
           variant="icon"
@@ -193,16 +209,7 @@ function AsReadRow({ entry, enc, flag, onChange, nested, text, children }: {
               ) : (
                 <EditForm entry={entry} busy={busy} onSave={(body) => act({ action: "edit", ...body })} onCancel={() => setEditing(false)} />
               )
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-light py-1.5" disabled={busy} onClick={() => setEditing(true)} aria-label={`Edit ${entry.label}`}>
-                  <Pencil size={14} aria-hidden /> Edit
-                </button>
-                <button className="btn-light py-1.5" disabled={busy} onClick={() => act({ action: "reject" })} aria-label={`Remove ${entry.label}`}>
-                  Remove
-                </button>
-              </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>

@@ -160,16 +160,22 @@ body::before {
     }
   }
   .card {
-    @apply rounded-card border border-white/90 bg-white/70 p-5 backdrop-blur-xl backdrop-saturate-150;
+    @apply rounded-card border border-white/90 bg-white/70 p-4 sm:p-5 backdrop-blur-xl backdrop-saturate-150;
     box-shadow: var(--lift);
+  }
+  /* Each blurred card is its own stacking context, so an open actions menu (z-30) would be painted
+     under the next card; lift the card that holds the open menu above its neighbours. */
+  .card:has([aria-haspopup="menu"][aria-expanded="true"]) {
+    position: relative;
+    z-index: 20;
   }
   /* Solid white, no blur: the emergency card and the doctor page, where nothing may sit behind the text. */
   .card-solid {
-    @apply rounded-card border border-ink-200 bg-white p-5;
+    @apply rounded-card border border-ink-200 bg-white p-4 sm:p-5;
     box-shadow: var(--lift);
   }
   .hero {
-    @apply relative overflow-hidden rounded-card p-6 text-white;
+    @apply relative overflow-hidden rounded-card p-5 sm:p-6 text-white;
     background: var(--grad-hero);
     box-shadow: 0 16px 36px -20px rgb(42 84 73 / 0.42);
   }
@@ -203,7 +209,7 @@ body::before {
     @apply mb-1 block text-xs font-semibold text-ink-600;
   }
   .title {
-    @apply text-3xl font-bold tracking-tight text-ink-900;
+    @apply text-2xl sm:text-3xl font-bold tracking-tight text-ink-900;
   }
   .section-title {
     @apply text-lg font-bold tracking-tight text-ink-900;

@@ -9,10 +9,12 @@ const COULD_NOT_HEAR = "Couldn't hear that. Please type it instead.";
 
 /** "Speak instead": records up to 85 s, sends it for writing down, and hands the text back.
  * The text is only added to the box; nothing is sent until the person presses the main button. */
-export function VoiceButton({ patientId, onText, disabled }: {
+export function VoiceButton({ patientId, onText, disabled, compact = false }: {
   patientId: string;
   onText: (text: string) => void;
   disabled?: boolean;
+  /** Icon only, for a row that already holds other controls (Ask); the error note wraps onto its own line. */
+  compact?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "starting" | "recording" | "writing">("idle");
   const [seconds, setSeconds] = useState(0);
@@ -98,6 +100,45 @@ export function VoiceButton({ patientId, onText, disabled }: {
   function stop() {
     const rec = recorder.current;
     if (rec && rec.state !== "inactive") rec.stop();
+  }
+
+  if (compact) {
+    return (
+      <div className="contents">
+        {state === "recording" ? (
+          <button
+            type="button"
+            className="btn min-h-11 min-w-11 shrink-0 px-3"
+            onClick={stop}
+            aria-label={`Stop recording, ${seconds} of ${MAX_SECONDS} seconds`}
+          >
+            <Square size={16} aria-hidden /> Stop {seconds} s
+          </button>
+        ) : state === "writing" || state === "starting" ? (
+          <span className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-ink-600" role="status">
+            <Loader2 size={16} className="animate-spin" aria-hidden />
+            <span className="sr-only">{state === "writing" ? "Writing it down…" : "Waiting for the microphone…"}</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="btn-light min-h-11 min-w-11 shrink-0 px-3"
+            onClick={start}
+            disabled={disabled}
+            aria-label="Speak instead of typing"
+            title="Speak instead"
+          >
+            <Mic size={16} aria-hidden /> <span className="hidden sm:inline">Speak</span>
+          </button>
+        )}
+        {/* Last in the row, so an error wraps below the whole row, not between the mic and Ask. */}
+        {error && (
+          <div className="order-last basis-full">
+            <ErrorNote error={error} />
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (

@@ -76,13 +76,20 @@ export function emergencyAlert(a: { log_entry_id: string | null }, log: ({ id: s
   return !!entry && entry.reason === "emergency";
 }
 
+/** What happened, without the place ("Opened your emergency card"). */
+export function accessWhat(e: AccessLike): string {
+  return startedEmergency(e)
+    ? "Started an emergency and saw only the basics"
+    : e.via
+      ? `Opened your emergency card with ${e.via}'s QR code`
+      : "Opened your emergency card";
+}
+
+/** True when a trusted person started an emergency (they see the basics only). */
+export const startedEmergencyEntry = (e: AccessLike) => e.reason === "emergency" && startedEmergency(e);
+
 export function accessLine(e: AccessLike): string {
-  const what =
-    startedEmergency(e)
-      ? "Started an emergency and saw only the basics"
-      : e.via
-        ? `Opened your emergency card with ${e.via}'s QR code`
-        : "Opened your emergency card";
+  const what = accessWhat(e);
   return e.place ? `${what} at ${e.place}` : what;
 }
 
@@ -149,9 +156,13 @@ const DOSE_WORDS: Record<string, string> = {
 /** "1-0-1" -> "1-0-1 (morning and night)", "SOS" -> "SOS (only when needed)". A pattern that is
  * not in the table (or already has words) comes back exactly as written. */
 export function dosePattern(text: string): string {
-  const key = text.trim().replace(/\s*-\s*/g, "-").toLowerCase();
-  const words = DOSE_WORDS[key];
+  const words = doseWords(text);
   return words ? `${text.trim()} (${words})` : text;
+}
+
+/** The plain words alone for a pattern in the table ("1-0-1" -> "morning and night"), else null. */
+export function doseWords(text: string): string | null {
+  return DOSE_WORDS[text.trim().replace(/\s*-\s*/g, "-").toLowerCase()] ?? null;
 }
 
 export const stepLabels: Record<string, string> = {

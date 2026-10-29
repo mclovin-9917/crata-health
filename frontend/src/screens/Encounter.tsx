@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { AddedFromVisit } from "../asread";
 import {
-  Disclosure, EditForm, EntryDetails, ErrorNote, FlagNotes, KIND_GROUPS, KindIcon, MatchedFrom, Note, SaidBy, WhereFrom,
+  ActionsMenu, Disclosure, DoseColumn, EditForm, EntryDetails, ErrorNote, FlagNotes, KIND_GROUPS, KindIcon, MatchedFrom, Note, SaidBy, WhereFrom,
   addedToVisit, clashLine, genericLine,
 } from "../components";
 import { AddToVisit } from "../addToVisit";
@@ -115,9 +115,12 @@ export default function EncounterScreen({ encounterId }: { encounterId: string }
                 })
               }
             />
-            <p className="mt-1 text-ink-600">
-              You confirm allergies, medicines, diagnoses and events. The rest is already added, and you can change it.
-            </p>
+            <Disclosure label="How this works" className="mt-1">
+              <div className="space-y-2 pb-1 text-sm text-ink-600">
+                <p>You confirm allergies, medicines, diagnoses and events. The rest is already added, and you can change it.</p>
+                <FilesLine files={enc.sources.filter((s) => !s.reread_of)} />
+              </div>
+            </Disclosure>
             {toReview.length > 0 && (
               <p className="mt-2 flex items-start gap-2 text-sm font-semibold text-tide-700">
                 <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden />
@@ -181,6 +184,18 @@ const DATE_SOURCE: Record<string, string> = {
 };
 const SOURCE_ICON: Record<string, string> = { audio: "Recording", image: "Photo or PDF", text: "Typed notes" };
 
+/** The files this visit was read from (re-reads left out). */
+function FilesLine({ files }: { files: SourceItem[] }) {
+  if (files.length === 0) return null;
+  return (
+    <p className="mt-1 text-xs text-ink-500">
+      {files.map((s) => (
+        <span key={s.id} className="mr-3">{SOURCE_ICON[s.source_type] ?? s.source_type}{s.filename ? `: ${s.filename}` : ""}</span>
+      ))}
+    </p>
+  );
+}
+
 /** The top of a visit: the date and the place, then the visit's name as the heading. The name is
  * the AI's suggestion (marked) until the patient writes their own; the date can be corrected. */
 function VisitHead({ enc, onChange }: { enc: Encounter; onChange: (updated: Encounter) => void }) {
@@ -229,7 +244,6 @@ function VisitHead({ enc, onChange }: { enc: Encounter; onChange: (updated: Enco
       <button type="button" className="btn-light" disabled={busy} onClick={close}>Cancel</button>
     </form>
   );
-  const files = enc.sources.filter((s) => !s.reread_of);
   const dateNote = DATE_SOURCE[enc.visit_date_source ?? "upload"];
 
   return (
@@ -265,13 +279,6 @@ function VisitHead({ enc, onChange }: { enc: Encounter; onChange: (updated: Enco
             <Pencil size={14} aria-hidden /> {enc.title ? "Edit name" : "Add a name"}
           </button>
         </div>
-      )}
-      {files.length > 0 && (
-        <p className="mt-1 text-xs text-ink-500">
-          {files.map((s) => (
-            <span key={s.id} className="mr-3">{SOURCE_ICON[s.source_type] ?? s.source_type}{s.filename ? `: ${s.filename}` : ""}</span>
-          ))}
-        </p>
       )}
       <ErrorNote error={error} />
     </div>
@@ -357,7 +364,8 @@ function KindGroups({ entries, row }: {
   return (
     <div className="space-y-3">
       {groups.map((g) => (
-        <section key={g.title} className={`card overflow-hidden p-0 ${frame}`} aria-label={g.title}>
+        // Confirmed rows have a menu that opens downward, so only the suggested box clips its corners.
+        <section key={g.title} className={`card p-0 ${status === "proposed" ? "overflow-hidden" : ""} ${frame}`} aria-label={g.title}>
           <h3 className="flex items-center gap-3 px-5 pt-4 pb-1 font-semibold">
             <KindIcon kind={g.kinds[0]} small />
             {g.title}
@@ -386,7 +394,7 @@ const CHECK_TITLE: Record<Discrepancy["check"], string> = {
 /** Cross-check findings, at the top of Review: red for an allergy clash, amber for everything
  * else. Decision support only: the wording says who to ask, never what to take. */
 const CHECKS_NOTE =
-  "Automatic checks, not medical advice. Ask your doctor or pharmacist what they mean for you.";
+  "Automatic checks, not medical advice. Ask your doctor or pharmacist.";
 
 function Checks({ found, enc }: { found: Discrepancy[]; enc: Encounter }) {
   const bills = new Set(enc.sources.filter((s) => s.document_kind === "bill").map((s) => s.id));
@@ -403,7 +411,7 @@ function Checks({ found, enc }: { found: Discrepancy[]; enc: Encounter }) {
         return (
           <article
             key={d.id}
-            className={`space-y-2 rounded-3xl px-5 py-4 ring-1 ${
+            className={`space-y-2 rounded-3xl px-4 py-3 ring-1 sm:px-5 sm:py-4 ${
               red ? "bg-red-50 text-red-950 ring-red-200" : "bg-amber-50 text-amber-950 ring-amber-200"
             }`}
           >
@@ -530,17 +538,44 @@ function EntryCard({ entry, enc, known, flag, onChange, showKind }: {
         </div>
       )}
 
-      <div className="flex gap-3">
-        <div className="min-w-0">
-          {showKind && <p className="text-xs font-semibold tracking-wide text-ink-500 uppercase">{kindLabel(entry.kind)}</p>}
-          <p className="text-xl font-bold tracking-tight">{entry.label}</p>
-          {genericLine(entry) && (
-            <p className="text-sm font-semibold text-ink-600">
-              Contains {genericLine(entry)}
-              <MatchedFrom medication={entry.medication} />
-            </p>
+      {/* Two rows: the name (full width) with the actions menu at the right end, then the details
+          with a medicine's frequency column at the right. */}
+      <div>
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            {showKind && <p className="text-xs font-semibold tracking-wide text-ink-500 uppercase">{kindLabel(entry.kind)}</p>}
+            <p className="text-xl font-bold tracking-tight">{entry.label}</p>
+          </div>
+          {!suggested && !editing && (
+            <ActionsMenu
+              name={entry.label}
+              items={[
+                {
+                  label: "Edit",
+                  icon: <Pencil size={16} aria-hidden />,
+                  disabled: busy,
+                  onSelect: () => {
+                    setEditing(true);
+                    // The menu is gone once the form opens: put focus on the form's first field (EditForm's ids).
+                    requestAnimationFrame(() => document.getElementById(`edit-${entry.id}-label`)?.focus());
+                  },
+                },
+                { label: "Remove", icon: <X size={16} aria-hidden />, onSelect: () => void act({ action: "reject" }), disabled: busy },
+              ]}
+            />
           )}
-          <EntryDetails entry={entry} />
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {genericLine(entry) && (
+              <p className="text-sm font-semibold text-ink-600">
+                Contains {genericLine(entry)}
+                <MatchedFrom medication={entry.medication} />
+              </p>
+            )}
+            <EntryDetails entry={entry} dose={entry.kind === "medication" ? "column" : "inline"} />
+          </div>
+          {entry.kind === "medication" && <DoseColumn entry={entry} />}
         </div>
       </div>
 
@@ -566,12 +601,7 @@ function EntryCard({ entry, enc, known, flag, onChange, showKind }: {
             <X size={16} aria-hidden /> Don't add
           </button>
         </div>
-      ) : (
-        <span className="flex gap-2">
-          <button className="btn-light py-1.5" disabled={busy} onClick={() => setEditing(true)}>Edit</button>
-          <button className="btn-light py-1.5" disabled={busy} onClick={() => act({ action: "reject" })}>Remove</button>
-        </span>
-      )}
+      ) : null}
       {/* The proof stays reachable while editing, so the quote can be checked against the words. */}
       <div className="-mt-2">{proofButton}</div>
       {entry.kind === "test" && !editing && !valuesOf(enc.entries, entry).some((v) => v.status !== "rejected") && (
@@ -664,8 +694,14 @@ function ReviewBox({ title, kinds, items, known, flags, row, onBulk }: {
                   </span>
                 )}
               </p>
-              {genericLine(e) && <p className="text-sm font-semibold text-ink-600">Contains {genericLine(e)}</p>}
-              <EntryDetails entry={e} />
+              {/* Details on the left, a medicine's frequency column on the right. */}
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  {genericLine(e) && <p className="text-sm font-semibold text-ink-600">Contains {genericLine(e)}</p>}
+                  <EntryDetails entry={e} dose={e.kind === "medication" ? "column" : "inline"} />
+                </div>
+                {e.kind === "medication" && <DoseColumn entry={e} />}
+              </div>
             </li>
           ))}
         </ul>

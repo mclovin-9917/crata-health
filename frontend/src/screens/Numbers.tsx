@@ -1,9 +1,9 @@
-import { AlertTriangle, ChevronDown, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, type NumberPoint, type NumberSeries, type NumbersGroup, type Preset } from "../api";
 import { useMe } from "../App";
 import { BandNotes, Chart, lineName, plainName, rangeWords, shown } from "../charts";
-import { ErrorNote, Note } from "../components";
+import { ActionsMenu, ErrorNote, Note } from "../components";
 import { formatDate, go, useLoad } from "../lib";
 
 /** My health numbers: every number in the record over time, from the reports and from readings
@@ -17,10 +17,10 @@ export default function NumbersScreen({ openKey }: { openKey?: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="title">My health numbers</h1>
-        <button className="btn ml-auto" onClick={() => setAdding(true)} disabled={adding || !data}>
-          <Plus size={16} aria-hidden /> Add a reading
+      <div className="flex items-center gap-3">
+        <h1 className="title min-w-0">My health numbers</h1>
+        <button className="btn shrink-0 ml-auto" onClick={() => setAdding(true)} disabled={adding || !data} aria-label="Add a reading">
+          <Plus size={16} aria-hidden /> <span className="sm:hidden">Add</span><span className="hidden sm:inline">Add a reading</span>
         </button>
       </div>
       <p className="text-ink-600">
@@ -68,7 +68,7 @@ function rangeNote(p: NumberPoint): string | null {
 
 const unitOf = (s: NumberSeries) => (s.unit_missing ? "(unit not printed)" : s.unit ?? "");
 
-const HEAD = "px-3 py-2 text-xs font-bold tracking-wider text-ink-600 uppercase";
+const HEAD = "px-2 md:px-3 py-2 text-xs font-bold tracking-wider text-ink-600 uppercase";
 /* Below `md` the range, date and trend columns shrink to nothing instead of being display:none, so the
    table keeps the same number of columns and the open row can span all of them. Their text stays
    readable to a screen reader; the narrow layout shows the same facts inside the first two columns. */
@@ -95,11 +95,11 @@ function NumbersTable({ groups, onChanged, initialOpen }: { groups: NumbersGroup
         <thead>
           <tr>
             <th scope="col" className={HEAD}>Measure</th>
-            <th scope="col" className={`${HEAD} w-36 text-right`}>Latest</th>
+            <th scope="col" className={`${HEAD} w-32 md:w-36 text-right`}>Latest</th>
             <th scope="col" className={`${HEAD} ${NARROW} md:w-32`}>Printed range</th>
             <th scope="col" className={`${HEAD} ${NARROW} md:w-28`}>Date</th>
             <th scope="col" className={`${HEAD} ${NARROW} md:w-[7.5rem]`}>Trend</th>
-            <th scope="col" className="w-10"><span className="sr-only">Open or close the details</span></th>
+            <th scope="col" className="w-8 md:w-10"><span className="sr-only">Open or close the details</span></th>
           </tr>
         </thead>
         {groups.map((g) => (
@@ -164,7 +164,7 @@ function GroupRows({ group, open, onToggle, onChanged }: {
         className={`cursor-pointer transition-colors hover:bg-white/60 has-[:focus-visible]:bg-tide-50 ${open ? "bg-white/50" : ""}`}
         onClick={onToggle}
       >
-        <td className="px-3 py-3 align-middle">
+        <td className="px-2 md:px-3 py-3 align-middle">
           {/* No onClick on the button: its click reaches the row, which toggles once. */}
           <button
             type="button"
@@ -176,7 +176,7 @@ function GroupRows({ group, open, onToggle, onChanged }: {
           </button>
           {date && <span className="mt-0.5 block text-xs text-ink-500 md:hidden">{date}, {count}</span>}
         </td>
-        <td className="px-3 py-3 text-right align-middle">
+        <td className="px-2 md:px-3 py-3 text-right align-middle">
           {latest ? (
             <>
               {uniform ? (
@@ -234,13 +234,13 @@ function GroupRows({ group, open, onToggle, onChanged }: {
           <span className="block text-xs text-ink-500">{count}</span>
         </td>
         <td className={`px-3 py-3 align-middle ${NARROW}`}><Chart series={group.series} /></td>
-        <td className="w-10 py-3 pr-3 text-right align-middle text-ink-500">
+        <td className="w-8 md:w-10 py-3 pr-2 md:pr-3 text-right align-middle text-ink-500">
           <ChevronDown size={18} className={`inline transition ${open ? "rotate-180" : ""}`} aria-hidden />
         </td>
       </tr>
       {open && (
         <tr>
-          <td colSpan={6} className="px-3 pt-1 pb-5">
+          <td colSpan={6} className="px-2 md:px-3 pt-1 pb-5">
             <div id={detailId} className="space-y-4">
               <div className="space-y-2">
                 <Chart series={group.series} big />
@@ -311,18 +311,17 @@ function Reading({ point: p, name, unit, onChanged }: { point: NumberPoint; name
           )}
           {p.edited && ", edited by you"}
         </span>
-        <span className="ml-auto flex gap-2">
+        <span className="ml-auto flex items-center">
           {p.removed ? (
-            <button className="btn-light py-1" disabled={busy} onClick={() => act({ action: "confirm" })} aria-label={`Add the ${name} reading of ${formatDate(p.on)} back`}>Add back</button>
+            <button className="link-quiet" disabled={busy} onClick={() => act({ action: "confirm" })} aria-label={`Add the ${name} reading of ${formatDate(p.on)} back`}>Add back</button>
           ) : (
-            <>
-              <button className="btn-light py-1" disabled={busy} onClick={() => setEditing(!editing)} aria-label={`Edit the ${name} reading of ${formatDate(p.on)}`}>
-                <Pencil size={14} aria-hidden /> Edit
-              </button>
-              <button className="btn-light py-1" disabled={busy} onClick={() => act({ action: "reject" })} aria-label={`Remove the ${name} reading of ${formatDate(p.on)}`}>
-                Remove
-              </button>
-            </>
+            <ActionsMenu
+              name={`${name} reading of ${formatDate(p.on)}`}
+              items={[
+                { label: "Edit", icon: <Pencil size={16} aria-hidden />, disabled: busy, onSelect: () => setEditing(true) },
+                { label: "Remove", icon: <X size={16} aria-hidden />, disabled: busy, onSelect: () => void act({ action: "reject" }) },
+              ]}
+            />
           )}
         </span>
       </div>
