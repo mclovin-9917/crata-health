@@ -94,6 +94,9 @@ export function accessLine(e: AccessLike): string {
 }
 
 // ---- small formatters --------------------------------------------------------
+/** "right knee pain" -> "Right knee pain" (the model often writes symptoms in lower case). */
+export const capFirst = (s: string) => s.replace(/^\s*./, (c) => c.toUpperCase());
+
 export const kindLabel = (k: string) => {
   if (k === "result") return "Test result";
   if (k === "follow_up") return "Follow-up";

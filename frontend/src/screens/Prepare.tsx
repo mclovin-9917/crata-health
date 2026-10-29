@@ -4,7 +4,7 @@ import { api, type PrepAnswer, type PrepQuestions } from "../api";
 import { useMe } from "../App";
 import { EmergencyNow } from "../assist";
 import { ErrorNote } from "../components";
-import { formatDate, go, useLoad } from "../lib";
+import { capFirst, formatDate, go, useLoad } from "../lib";
 import { appendText, VoiceButton } from "../voice";
 
 /** Before a visit: say what you feel, get a summary to hand to the doctor. */
@@ -77,7 +77,7 @@ export default function PrepareScreen() {
               id="prep-text"
               className="input min-h-32"
               maxLength={2000}
-              placeholder="For example: itchy rash on both arms for 4 days, worse at night"
+              placeholder="For example: knee pain and swelling for a week, worse on the stairs"
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={busy}
@@ -204,7 +204,7 @@ export default function PrepareScreen() {
                           </span>
                         )}
                       </span>
-                      <span className="block truncate text-sm text-ink-600">{p.symptoms[0]?.text ?? p.text}</span>
+                      <span className="block truncate text-sm text-ink-600">{capFirst(p.symptoms[0]?.text ?? p.text)}</span>
                     </span>
                     <ChevronRight size={20} className="shrink-0 text-ink-500" aria-hidden />
                   </button>

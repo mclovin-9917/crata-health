@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { api, type OutOfRangeTest } from "../api";
 import { EmergencyNow } from "../assist";
 import { ErrorNote } from "../components";
-import { formatDate, go, useLoad } from "../lib";
+import { capFirst, formatDate, go, useLoad } from "../lib";
 
 /** One saved summary for the doctor: who to see, the summary itself (printable), Print, Delete. */
 export default function PrepViewScreen({ prepId }: { prepId: string }) {
@@ -66,10 +66,10 @@ export default function PrepViewScreen({ prepId }: { prepId: string }) {
         <dl className="divide-y divide-ink-100">
           <Row label="Symptoms">
             {p.symptoms.length ? (
-              <ul className="list-disc space-y-0.5 pl-5">{p.symptoms.map((s, i) => <li key={i}>{s.text}</li>)}</ul>
+              <ul className="list-disc space-y-0.5 pl-5">{p.symptoms.map((s, i) => <li key={i}>{capFirst(s.text)}</li>)}</ul>
             ) : <None />}
           </Row>
-          {p.since && <Row label="Since"><p>{p.since}</p></Row>}
+          {p.since && <Row label="Since"><p>{capFirst(p.since)}</p></Row>}
           {(p.answers ?? []).length > 0 && (
             <Row label="Asked before the visit">
               <ul className="space-y-2">
