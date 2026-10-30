@@ -35,6 +35,7 @@ BACKEND = ROOT / "backend"
 CASE_FILES = ROOT / "samples" / "eval"
 RESULTS = HERE / "results"
 ULTRA = "nvidia/Nemotron-3-Ultra-550b-a55b"  # Token Factory model list, 2026-10-26
+NANO = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"  # Token Factory model list, 2026-10-30
 
 def _config(perceive: str, reason: str, model_perceive: str = "", model_reason: str = "",
             backups: bool = False) -> dict[str, str]:
@@ -50,6 +51,7 @@ CONFIGS: dict[str, dict[str, str]] = {
     # The comparisons have no backups, so every answer comes from the model named. A hung call
     # fails the case (counted as a miss).
     "ultra": _config("nvidia", "nebius", model_reason=ULTRA),
+    "nano": _config("nvidia", "nebius", model_reason=NANO),
     "omni": _config("nvidia", "nebius"),
     "gemma": _config("nebius", "nebius", model_perceive="google/gemma-3-27b-it"),
 }
@@ -61,6 +63,8 @@ PRICES: dict[str, tuple[float, float, float] | None] = {
     "nebius:nvidia/nemotron-3-super-120b-a12b": (0.30, 0.06, 0.90),
     f"nebius:{ULTRA}": (1.00, 0.12, 3.00),
     "nebius:google/gemma-3-27b-it": (0.10, 0.10, 0.30),  # no cached line on the bill
+    # Nano: Nebius's rate as listed on OpenRouter, 2026-10-30 (no cached rate found; charged as input).
+    f"nebius:{NANO}": (0.06, 0.06, 0.24),
 }
 
 
@@ -72,7 +76,7 @@ def setup(config: str) -> None:
     os.chdir(BACKEND)  # settings read backend/.env
 
 
-def run_case(client, db, case, run: int) -> dict:
+def run_case(client, db, case, run: int, photos: bool = False) -> dict:
     """One patient, one visit. Returns what the app found, raw, for scoring."""
     from app.schemas.account import Account, AccountRole
     from app.schemas.patient import Patient
@@ -103,8 +107,13 @@ def run_case(client, db, case, run: int) -> dict:
         db.save_entry(e)
     sign_in_as(client, Account(role=AccountRole.PATIENT, name=case.patient, person_id=pid))
 
-    files = [("documents", (n, (CASE_FILES / case.id / n).read_bytes(), "image/png"))
-             for n in ("prescription.png", "bill.png")]
+    if photos:  # the same pages as phone photos (photos.py), seeded per case and file
+        from photos import phone_photo
+        files = [("documents", (n[:-4] + ".jpg", phone_photo((CASE_FILES / case.id / n).read_bytes(), case.id, n),
+                                "image/jpeg")) for n in ("prescription.png", "bill.png")]
+    else:
+        files = [("documents", (n, (CASE_FILES / case.id / n).read_bytes(), "image/png"))
+                 for n in ("prescription.png", "bill.png")]
     t0 = time.time()
     r = client.post(f"/api/patients/{pid}/encounters", files=files)  # read before it returns
     seconds = time.time() - t0
@@ -215,6 +224,7 @@ def main() -> int:
     ap.add_argument("--config", choices=sorted(CONFIGS), default="main")
     ap.add_argument("--runs", type=int, default=1)
     ap.add_argument("--cases", default="", help="comma-separated ids; all by default")
+    ap.add_argument("--photos", action="store_true", help="read phone-photo versions (photos.py)")
     args = ap.parse_args()
     setup(args.config)
 
@@ -228,7 +238,7 @@ def main() -> int:
 
     chosen = [c for c in CASES if not args.cases or c.id in args.cases.split(",")]
     ai = AIClient()
-    print(f"config {args.config}: perceive {ai.settings.perceive.provider}:{ai.settings.perceive.model}, "
+    print(f"config {args.config}{' (phone photos)' if args.photos else ''}: perceive {ai.settings.perceive.provider}:{ai.settings.perceive.model}, "
           f"reason {ai.settings.reason.provider}:{ai.settings.reason.model}, "
           f"backups {'on' if ai.settings.fallback else 'off'}")
     db = Storage()  # one in-memory database for the whole run (the brand-name cache is shared)
@@ -237,7 +247,7 @@ def main() -> int:
     for run in range(1, args.runs + 1):
         for case in chosen:
             try:
-                got = run_case(client, db, case, run)
+                got = run_case(client, db, case, run, photos=args.photos)
             except Exception as exc:  # noqa: BLE001  (a failed call is a result too, not a reason to stop)
                 got = {"case": case.id, "run": run, "seconds": 0, "status": "error", "error": str(exc),
                        "models_used": {}, "step_seconds": {}, "discrepancies": [], "medicines": [],
@@ -254,8 +264,8 @@ def main() -> int:
     text = summary(rows, usage)
     RESULTS.mkdir(exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
-    out = RESULTS / f"{args.config}-{stamp}.json"
-    out.write_text(json.dumps({"config": args.config, "runs": args.runs,
+    out = RESULTS / f"{args.config}{'-photos' if args.photos else ''}-{stamp}.json"
+    out.write_text(json.dumps({"config": args.config, "runs": args.runs, "photos": args.photos,
                                "settings": CONFIGS[args.config], "usage": usage, "summary": text,
                                "rows": rows}, indent=1) + "\n", "utf-8")
     print("\n" + text + f"\n\nSaved {out.relative_to(ROOT)}")

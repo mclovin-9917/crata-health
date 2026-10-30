@@ -1,0 +1,47 @@
+{
+ "n": 5,
+ "seconds": {
+  "prep_questions": [
+   3.6,
+   0.7,
+   1.3,
+   1.0,
+   0.9
+  ],
+  "prep_summary": [
+   1.7,
+   1.2,
+   1.6,
+   1.2,
+   1.2
+  ],
+  "ask_record": [
+   1.1,
+   1.0,
+   1.0,
+   2.2,
+   1.0
+  ],
+  "ask_food": [
+   5.1,
+   9.6,
+   6.2,
+   4.5,
+   3.2
+  ]
+ },
+ "cost_per_use": {
+  "before_a_visit": 0.000621396,
+  "ask_record": 0.00020597999999999998,
+  "ask_food": 0.001112772
+ },
+ "usage": {
+  "nebius:nvidia/nemotron-3-super-120b-a12b": {
+   "calls": 38,
+   "prompt_tokens": 41923,
+   "completion_tokens": 3008,
+   "cached_tokens": 23264
+  }
+ },
+ "summary": "Runs: 5 of each, demo patient Asha, reasoning on Token Factory (Nemotron 3 Super)\nprep_questions: median 1.0 s, min 0.7 s, max 3.6 s\nprep_summary: median 1.2 s, min 1.2 s, max 1.7 s\nask_record: median 1.0 s, min 1.0 s, max 2.2 s\nask_food: median 5.1 s, min 3.2 s, max 9.6 s\nToken Factory cost per use, before_a_visit: $0.00062\nToken Factory cost per use, ask_record: $0.00021\nToken Factory cost per use, ask_food: $0.00111\nWeb search (Tavily) for the food question is not in the cost above."
+}

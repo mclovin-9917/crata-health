@@ -61,9 +61,11 @@ Every search goes through one client (`backend/app/ai/search.py`) and is limited
 | Time per visit | median 26.5 seconds |
 | Token Factory cost | $0.16 for all 42 visits |
 
-These are clean, printed documents of the kind the app was built for. They do not show how it does on handwriting, poor photos or recordings.
+These are printed documents of the kind the app was built for. The same 42 visits as phone photos (tilted, shadowed, dim, blurred) gave the same results: 15 of 15 clashes, 75 of 75 medicines, no false alarms, median 24.1 seconds, $0.15 in all. Handwriting and recordings are not measured.
 
-Comparisons on the same cases: Nemotron 3 Ultra gave the same answers as Super at about 4 times the cost. Nano Omni was right on every visit it read, but NVIDIA build's free tier turned away 4 of 14; Gemma 3 27B on Token Factory read all 14 right, which is why it is the backup. Full tables in [docs/eval.md](docs/eval.md).
+Comparisons on the same cases: Nemotron 3 Nano reasoning cost half as much as Super but failed a visit, missed an allergy clash and 4 medicines, and raised 5 false bill alarms; Nemotron 3 Ultra was faster (median 14.1 seconds) at 4.1 times the cost, with 9 false bill alarms (it read "Mox 500" on a bill as moxifloxacin, not amoxicillin). Super was the only size with no misses and no false alarms, so it stays. Nano Omni was right on every visit it read, but NVIDIA build's free tier turned away 4 of 14; Gemma 3 27B on Token Factory read all 14 right, which is why it is the backup. Full tables in [docs/eval.md](docs/eval.md).
+
+The other features, timed with the real models (median of 5): Before a visit's quick questions 1.0 seconds and its summary 1.2 seconds; an Ask answer from the record 1.0 seconds; a food question with a web search 5.1 seconds (one of 5 failed with a server error). Each costs well under a tenth of a US cent on Token Factory.
 
 ## Run it yourself
 

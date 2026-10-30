@@ -33,6 +33,8 @@ Settings:
 - **main**: as deployed for judging. Nano Omni on NVIDIA build reads, Super on Token Factory reasons, with the backups on (Gemma 3 27B on Token Factory reads when NVIDIA build does not answer in time, Super on NVIDIA build reasons when Token Factory does not). How often a backup answered is counted per step. 3 runs.
 - **ultra**: Nemotron 3 Ultra on Token Factory reasons instead of Super. Backups off. 1 run.
 - **omni** and **gemma**: Nano Omni alone against Gemma 3 27B alone, for reading. Backups off. 1 run each.
+- **nano**: Nemotron 3 Nano 30B on Token Factory reasons instead of Super. Backups off.
+- **--photos** (with any setting): the pages are read as phone photos made in memory by `photos.py`.
 
 Every setting sets all the model settings itself, so `backend/.env` cannot change a run. With the backups off, a call that hangs fails the visit, and it counts as a miss.
 
@@ -46,6 +48,9 @@ backend\.venv\Scripts\python scripts\eval\run_eval.py --config main --runs 3
 backend\.venv\Scripts\python scripts\eval\run_eval.py --config ultra
 backend\.venv\Scripts\python scripts\eval\run_eval.py --config omni
 backend\.venv\Scripts\python scripts\eval\run_eval.py --config gemma
+backend\.venv\Scripts\python scripts\eval\run_eval.py --config main --runs 3 --photos
+backend\.venv\Scripts\python scripts\eval\run_eval.py --config nano --runs 3
+backend\.venv\Scripts\python scripts\eval\time_features.py --n 5
 ```
 
 ## Results
@@ -87,5 +92,45 @@ The same answer came back in all three runs for every case. Nano Omni on NVIDIA 
 - **Nano Omni vs Gemma 3 27B for reading:** every visit Omni read was fully right. The 4 it missed were refused by NVIDIA build's free tier ("503 ResourceExhausted: Worker local total request limit reached"), not misread. Gemma on Token Factory read all 14 right. This is why the app keeps Gemma as Omni's backup: in the main runs it stepped in for 16 of 42 visits.
 
 Raw output: `scripts/eval/results/ultra-20261026-1309.json`, `omni-20261026-1314.json`, `gemma-20261026-1321.json`.
+
+### Phone photos, model sizes and feature timings (2026-10-30)
+
+Three new runs of the 14 cases, 3 runs each (42 visits), with nothing changed in the app or the prompts.
+
+- **Phone photos** (`--photos`): each clean page is turned, in memory, into a quick phone photo: on a desk, tilted and turned up to 4 degrees, a soft shadow across one side, darker, slightly blurred, saved as a JPEG at quality 55 to 68 (`scripts/eval/photos.py`, seeded by case and file so every run sees the same photo). Main setup.
+- **Nano reasons**: Nemotron 3 Nano 30B (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) on Token Factory instead of Super, clean pages, backups off.
+- **Ultra reasons**, again: the 26 Oct comparison had 1 run; this one has 3, so all three sizes are compared on the same 42 visits. Clean pages, backups off.
+
+| | Super (main, clean, 26 Oct) | Super, phone photos | Nano reasons | Ultra reasons |
+|---|---|---|---|---|
+| Visits read | 42 of 42 | 42 of 42 | 41 of 42 | 42 of 42 |
+| Allergy clash caught (right colour and medicine) | 15 of 15 | 15 of 15 | 14 of 15 | 15 of 15 |
+| Allergy false alarms | 0 | 0 | 0 | 0 |
+| Medicines read | 75 of 75 | 75 of 75 | 71 of 75 | 75 of 75 |
+| Medicines invented | 0 | 0 | 0 | 0 |
+| Billed but not prescribed caught | 12 of 12 | 12 of 12 | 12 of 12 | 12 of 12 |
+| Billed false alarms | 0 | 0 | 5 | 9 |
+| Backup answered | Gemma read 16 of 42 | never | off | off |
+| Median seconds per visit | 26.5 | 24.1 | 29.2 | 14.1 |
+| Token Factory cost, 42 visits | $0.157 | $0.148 | $0.074 | $0.648 |
+| Cost per visit | $0.0037 | $0.0035 | $0.0018 | $0.0154 |
+
+- **Phone photos:** the same answers as the clean pages on every count, and no backup was needed (Nano Omni read every photo). A photo of a printed page is not handwriting: handwriting is still not measured.
+- **Nano:** half the cost of Super, but one visit failed (Nano returned an empty answer on the extraction, so that visit's clash was lost), it left Dolo 650 off the prescription twice (and the bill check then flagged the Dolo on the bill as not prescribed), and on A5 it flagged Taxim-O on the bill in all three runs although it had read it on the prescription.
+- **Ultra:** the same clashes and medicines as Super, faster (median 14.1 s against 26.5 s), at 4.1 times the cost. All 9 false alarms have one cause: Ultra matched "Mox 500" on the bill to moxifloxacin instead of amoxicillin, so the bill line no longer matched the prescription (A1, A8, B5, every run).
+- **So Super stays:** the only size with no misses and no false alarms, at under half a US cent per visit.
+
+Raw output: `scripts/eval/results/main-photos-20261030-0602.json`, `nano-20261030-0607.json`, `ultra-20261030-0618.json`. Nano's price ($0.06 in, $0.24 out per million tokens) is Nebius's rate as listed on OpenRouter; we did not find it on a Nebius page.
+
+**Feature timings** (`scripts/eval/time_features.py`, 5 rounds for the demo patient Asha on a fresh database, Super on Token Factory, 2026-10-30):
+
+| Feature | Median seconds (min to max) | Token Factory cost per use |
+|---|---|---|
+| Before a visit: the quick questions | 1.0 (0.7 to 3.6) | $0.0006 for questions and summary together |
+| Before a visit: the summary | 1.2 (1.2 to 1.7) | (above) |
+| Ask, a question about the record | 1.0 (1.0 to 2.2) | $0.0002 |
+| Ask, a food question (web search) | 5.1 (3.2 to 9.6) | $0.0011, plus one Tavily search |
+
+One of the 5 food questions ("Is dates good for me?") failed with a 502. Raw output: `scripts/eval/results/features-20261030-0543.json`.
 
 What this does and does not show: on clean, printed prescriptions and bills of the kind the app was built for, the whole pipeline found every planted problem and raised no false alarm. It does not show how the app does on handwriting, poor photos, recordings, or medicines outside its brand table; see "How new they are" above.
