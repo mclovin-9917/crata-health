@@ -101,10 +101,9 @@ export default function App() {
   if (me.role === "doctor") {
     return (
       <AccountContext.Provider value={account}>
-        <Shell account={account}>
+        <Shell account={account} back={route[0] !== undefined && route[0] !== ""}>
           {route[0] === "scan" ? (
             <>
-              <BackHome />
               <ScanScreen />
             </>
           ) : (
@@ -120,9 +119,8 @@ export default function App() {
   return (
     <AccountContext.Provider value={account}>
       <MeContext.Provider value={person}>
-        <Shell account={account}>
-          {/* No menu bar: Home is the hub, every other screen has a way back to it. */}
-          {here !== "" && <BackHome />}
+        {/* No menu bar: Home is the hub (the logo); every other screen has a back arrow. */}
+        <Shell account={account} back={here !== ""}>
           <Screen route={route} admin={me.admin} />
         </Shell>
       </MeContext.Provider>
@@ -130,23 +128,27 @@ export default function App() {
   );
 }
 
-function BackHome() {
-  return (
-    <button
-      className="-ml-1 mb-4 inline-flex min-h-11 items-center gap-0.5 rounded-full py-1 pr-3 pl-1 text-sm font-semibold text-tide-700 transition hover:bg-white/70"
-      onClick={() => go("/")}
-    >
-      <ChevronLeft size={18} aria-hidden /> Back to Home
-    </button>
-  );
-}
+// Whether this tab has moved inside the app, so "back" stays in the app (else it goes Home).
+let movedInApp = false;
+window.addEventListener("hashchange", () => { movedInApp = true; });
+const goBack = () => (movedInApp ? window.history.back() : go("/"));
 
-function Shell({ account, children }: { account?: AccountState; children: ReactNode }) {
+function Shell({ account, back, children }: { account?: AccountState; back?: boolean; children: ReactNode }) {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-white/70 bg-white/60 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex max-w-3xl items-center gap-x-3 px-4 py-3 sm:flex-wrap sm:gap-y-2">
-          <a href="#/" className="flex items-center gap-2 font-bold tracking-tight text-ink-900">
+          {back && (
+            <button
+              type="button"
+              className="-mr-2 -ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-ink-700 transition hover:bg-white/70"
+              aria-label="Back"
+              onClick={goBack}
+            >
+              <ChevronLeft size={22} aria-hidden />
+            </button>
+          )}
+          <a href="#/" className="flex items-center gap-2 font-bold tracking-tight text-ink-900" aria-label="Crata Health, Home">
             <CrataMark size={28} />
             Crata Health
           </a>
